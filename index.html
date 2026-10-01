@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arena Buscaminas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0b0b0c;--panel:#111113;--line:#26262a;--txt:#ececee;--mut:#8b8b92;--dim:#5c5c63;--ok:#b6f36a;--vio:#b78cff;--jev:#ffd25e;--bad:#ff6b6b;--cell:#1b1b1f;--cellr:#2a2a30;
+--mono:'JetBrains Mono',ui-monospace,monospace;--sans:Inter,system-ui,sans-serif}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--sans)}
+a{color:var(--ok)}button,input,select{font:inherit;color:inherit}
+.wrap{max-width:1100px;margin:0 auto;padding:0 16px}
+header.wrap{text-align:center;padding:64px 16px 40px;border-bottom:1px solid var(--line)}
+h1{font-size:clamp(34px,6vw,60px);font-weight:600;letter-spacing:-.03em;line-height:1.02;margin:0}
+h1 span{display:block;color:var(--mut)}
+header p{color:var(--mut);margin:18px 0 0;line-height:1.6;font-size:15px}
+section{padding:28px 0;border-bottom:1px solid var(--line)}
+.lbl{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;display:flex;align-items:center;gap:10px}
+.lbl i{width:8px;height:8px;display:inline-block}
+.row-h{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.note{font-family:var(--mono);font-size:12px;color:var(--mut)}
+.tbl{border:1px solid var(--line);border-radius:6px;background:var(--panel);overflow:hidden}
+.tr{display:grid;grid-template-columns:1fr 170px 150px 44px;border-top:1px solid var(--line);align-items:center;min-height:62px}
+.tr.h{border-top:0;min-height:52px;font-family:var(--mono);font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
+.tr>div{padding:0 16px;height:100%;display:flex;align-items:center}
+.tr>div+div{border-left:1px solid var(--line)}
+.m{gap:14px;position:relative}
+.logo{width:30px;height:30px;border-radius:7px;display:grid;place-items:center;font-weight:600;font-size:13px;flex:none;background:#222;color:#fff}
+.m select.pick{background:transparent;border:0;outline:0;width:100%;font-size:16px;padding:10px 0 14px;cursor:pointer;color:var(--txt);min-width:0}
+.m select.pick option,.m select.pick optgroup{background:#111;color:var(--txt)}
+.m small{position:absolute;left:60px;bottom:6px;font-family:var(--mono);font-size:10px;color:var(--dim)}
+.price{font-family:var(--mono);font-size:12px;color:var(--mut)}
+select.reason{background:transparent;border:0;outline:0;width:100%;font-size:15px;padding:10px 0;cursor:pointer}
+select.reason option{background:#111}
+.x{background:none;border:0;color:var(--mut);font-size:18px;cursor:pointer;width:100%}
+.x:hover{color:var(--bad)}
+.foot{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-top:1px solid var(--line);gap:12px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:#16161a;border-radius:4px;padding:9px 14px;font-family:var(--mono);font-size:12px;letter-spacing:.05em;text-transform:uppercase;cursor:pointer}
+.btn:hover{border-color:#3a3a40}.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.pri{background:var(--ok);color:#0b0b0c;border-color:var(--ok);font-weight:600;padding:13px 22px;font-size:13px}
+.status{font-family:var(--mono);font-size:12px;margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.status .ok{color:var(--ok)}.status .no{color:var(--jev)}
+.keybox{display:none;gap:8px;margin-top:10px}.keybox.on{display:flex}
+.keybox input{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:8px 10px;font-family:var(--mono);font-size:12px}
+.cfg{display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+.cfg label{font-family:var(--mono);font-size:12px;color:var(--mut);display:flex;gap:10px;align-items:center}
+.cfg input{width:64px;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:11px 8px;text-align:center;font-size:16px;color:var(--txt)}
+.cfg input.seed{width:110px}
+.go{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.seedrow{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:18px 0 26px;border-bottom:1px solid var(--line);font-size:14px}
+.seedrow input{background:#141417;border:1px solid var(--line);border-radius:5px;padding:11px 14px;width:90px;font-size:16px;text-align:center}
+.big{width:100%;display:flex;justify-content:center;align-items:center;position:relative;background:#7b35d8;border:0;border-radius:4px;padding:20px;color:#fff;font-size:16px;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;transition:background .15s}
+.big:hover{background:#8a45e8}.big span:last-child{position:absolute;right:22px;font-size:20px}
+/* cuenta regresiva */
+#cuentaReg{position:fixed;inset:0;background:rgba(8,8,10,.86);display:none;place-items:center;z-index:50}
+#cuentaReg.on{display:grid}
+#cuentaReg b{font-size:min(38vw,260px);font-weight:600;letter-spacing:-.05em;color:var(--txt);animation:cr 1s ease-out both}
+#cuentaReg b.ya{color:var(--ok);font-size:min(22vw,150px)}
+@keyframes cr{0%{transform:scale(1.6);opacity:0}25%{opacity:1}100%{transform:scale(.85);opacity:.15}}
+.pn{position:relative}
+.pn canvas.conf{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5}
+@media (prefers-reduced-motion:reduce){#cuentaReg b{animation:none}}
+.err{color:var(--bad);font-family:var(--mono);font-size:12px}
+/* juego */
+#juego{display:none}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+.pn{border:1px solid var(--line);border-radius:6px;background:var(--panel);padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.pn.win{border-color:var(--ok)}.pn.lose{border-color:#5a2a2a}
+.pn-h{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.pn-h b{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tag{font-family:var(--mono);font-size:10px;padding:3px 6px;border-radius:3px;background:#1e1e22;color:var(--mut);white-space:nowrap}
+.tag.ok{color:#0b0b0c;background:var(--ok)}.tag.bad{background:#3a1d1d;color:var(--bad)}.tag.run{color:var(--jev)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-family:var(--mono);font-size:11px;color:var(--mut)}
+.stats span b{display:block;color:var(--txt);font-size:13px;font-weight:500}
+.bd{display:grid;gap:2px;width:100%;aspect-ratio:var(--ar)}
+.c{background:var(--cell);border-radius:2px;display:grid;place-items:center;font-family:var(--mono);font-weight:500;font-size:clamp(8px,1.1vw,13px);min-width:0;min-height:0;line-height:1}
+.c.r{background:var(--cellr)}.c.f::after{content:'⚑';color:var(--bad)}.c.x{background:var(--bad)}.c.x::after{content:'✹';color:#0b0b0c}
+.c.j{box-shadow:inset 0 0 0 2px var(--jev)}.c.new{animation:p .5s}
+@keyframes p{from{filter:brightness(2)}}
+.n1{color:#7fb2ff}.n2{color:#8be08b}.n3{color:#ff8a8a}.n4{color:#c89bff}.n5{color:#ffb86b}.n6{color:#6be0d6}.n7,.n8{color:#ddd}
+.last{font-family:var(--mono);font-size:11px;color:var(--mut);min-height:30px;line-height:1.4;overflow:hidden}
+.legend{font-family:var(--mono);font-size:11px;color:var(--mut);display:flex;gap:16px;flex-wrap:wrap;margin:0 0 14px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+table.res{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+table.res th{font-family:var(--mono);font-size:11px;color:var(--mut);text-transform:uppercase;font-weight:400;text-align:left;padding:10px 8px;border-bottom:1px solid var(--line)}
+table.res td{padding:10px 8px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.scroll{overflow-x:auto}
+footer.wrap{padding:28px 16px 60px;color:var(--dim);font-size:12px;font-family:var(--mono);line-height:1.7}
+@media (max-width:640px){.tr{grid-template-columns:1fr 110px 36px}.tr>div:nth-child(2){display:none}.cfg{gap:10px}}
+</style>
+</head>
+<body>
+<header class="wrap">
+  <h1>El mismo tablero.<span>Distintas inteligencias.</span></h1>
+  <p>JEV frente a los mejores modelos de IA.<br>Compara sus decisiones, velocidad y costo en Buscaminas.</p>
+</header>
+
+<main class="wrap">
+<div id="setup">
+  <section>
+    <div class="row-h"><div class="lbl"><i style="background:var(--ok)"></i>01 / Elige los modelos</div><div class="note">Hasta nueve. El mismo tablero.</div></div>
+    <div class="tbl">
+      <div class="tr h"><div>Modelo</div><div>Entrada / Salida · USD/M</div><div>Razonamiento</div><div></div></div>
+      <div id="filas"></div>
+      <div class="foot"><button class="btn" id="add">+ Agregar modelo</button><span class="note" id="cuenta"></span></div>
+    </div>
+    <datalist id="catalogo"></datalist>
+    <div class="status" id="status"></div>
+    <p class="note" id="keyhelp" style="line-height:1.6;margin:10px 0 0">Cada persona juega con <b style="color:var(--txt)">su propia cuenta de OpenRouter</b>: al conectarte, OpenRouter crea un acceso para este navegador y los tokens se descuentan de tu saldo. Esta página no tiene servidor: todo va directo de tu navegador a OpenRouter. ¿Querés tu propia arena? <a href="https://github.com/0rgan1co/arena-buscaminas" target="_blank" rel="noopener">Hacé fork en GitHub</a>.</p>
+  </section>
+
+  <section>
+    <div class="row-h" style="margin-bottom:0"><div class="lbl"><i style="background:var(--vio)"></i>02 / Configura el tablero</div>
+      <div class="cfg">
+        <label>Filas: <input id="filasN" type="number" min="5" max="30" value="10"></label>
+        <label>Columnas: <input id="colsN" type="number" min="5" max="30" value="10"></label>
+      </div>
+    </div>
+  </section>
+  <div class="seedrow"><label for="minasN">¿Cuántas minas quieres que tenga el tablero?</label><input id="minasN" type="number" min="1" value="15"><span class="note" id="minasHint">Más minas = más veces hay que arriesgar.</span></div>
+
+  <section style="border-bottom:0">
+    <div class="lbl" style="margin-bottom:16px"><i style="background:#7fd3ff"></i>03 / Que jueguen los modelos</div>
+    <button class="big" id="jugar"><span>Iniciar comparación</span><span aria-hidden="true">↗</span></button>
+    <div class="go" style="margin-top:12px"><button class="btn" id="simular">▶ Simular sin gastar</button><span class="note">Prueba el tablero y la pantalla con jugadores simulados: no llama a ninguna IA ni usa saldo.</span></div>
+    <div class="err" id="err" style="margin-top:10px"></div>
+    <p class="note" style="line-height:1.7;margin-top:22px">
+      3 vidas por modelo. Todos arrancan desde la misma celda central, siempre segura. <b style="color:var(--jev)">Jev</b> juega en equipo con código: el código hace lo que se puede demostrar y Jev elige la celda de menor riesgo solo cuando hay que arriesgar (sus decisiones quedan en amarillo). Los otros modelos ven el tablero completo y deciden todo. <b style="color:var(--txt)">Solo código</b> es el control sin IA y es gratis. El tiempo incluye la conexión a OpenRouter. Costo reportado por la API. Una partida es una observación, no un ranking general.
+    </p>
+  </section>
+</div>
+
+<div id="juego">
+  <section>
+    <div class="row-h"><div class="lbl"><i style="background:var(--jev)"></i><span id="titJuego">Partida</span></div>
+      <div class="go"><button class="btn" id="otra">Otra vez, mismo tablero</button><button class="btn" id="nuevo">Nuevo tablero</button><button class="btn" id="volver">Configurar</button></div></div>
+    <div class="legend"><span><i style="background:var(--cellr)"></i>revelada</span><span><i style="box-shadow:inset 0 0 0 2px var(--jev);background:var(--cellr)"></i>decisión de Jev</span><span><i style="background:var(--bad)"></i>mina pisada</span><span>⚑ bandera</span></div>
+    <div class="grid" id="paneles"></div>
+  </section>
+  <section>
+    <div class="lbl" style="margin-bottom:6px"><i style="background:var(--ok)"></i>Resultados</div>
+    <div class="scroll"><table class="res"><thead><tr><th>Modelo</th><th>Resultado</th><th>Celdas seguras</th><th>Vidas</th><th>Tiempo</th><th>Costo USD</th><th>Llamadas</th></tr></thead><tbody id="res"></tbody></table></div>
+    <p class="note" id="nota" style="margin-top:12px;line-height:1.6"></p>
+  </section>
+</div>
+</main>
+<div id="cuentaReg" aria-live="assertive"></div>
+<footer class="wrap">Costos: los informa OpenRouter en cada llamada (usage.cost). Precios del catálogo en vivo de OpenRouter. · <a href="partida-grabada.html">Ver la partida grabada anterior</a></footer>
+
+<script>
+'use strict';
+// ---------------- utilidades ----------------
+const $ = s => document.querySelector(s);
+const ls = { get(k){ try{ return localStorage.getItem(k) }catch(e){ return null } },
+             set(k,v){ try{ v==null?localStorage.removeItem(k):localStorage.setItem(k,v) }catch(e){} } };
+const ss = { get(k){ try{ return sessionStorage.getItem(k) }catch(e){ return null } },
+             set(k,v){ try{ sessionStorage.setItem(k,v) }catch(e){} } };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const fmtT = s => s < 60 ? s.toFixed(1)+' s' : Math.floor(s/60)+' min '+Math.round(s%60)+' s';
+const fmt$ = v => v == null ? '—' : v === 0 ? '0' : v < 0.001 ? v.toFixed(6) : v.toFixed(4);
+const OR = 'https://openrouter.ai';
+const JEV_ID = 'typesafe/jev-1.13', CODE_ID = 'codigo';
+
+// ---------------- catálogo ----------------
+const ESPECIALES = {
+  [JEV_ID]: { id: JEV_ID, name: 'TypeSafe AI / Jev 1.13', price: '$0.042 / gratis', reasoning: false },
+  [CODE_ID]: { id: CODE_ID, name: 'Solo código (control, sin IA)', price: 'gratis', reasoning: false },
+};
+let catalogo = {};   // id -> {id,name,price,reasoning}
+const precioM = p => { const n = parseFloat(p); return !isFinite(n) || n < 0 ? '?' : n === 0 ? 'gratis' : '$' + +(n * 1e6).toPrecision(3); };
+async function cargarCatalogo() {
+  try {
+    const r = await fetch(OR + '/api/v1/models'); const j = await r.json();
+    for (const m of j.data || []) {
+      if (m.id.startsWith('typesafe/')) continue;
+      const mods = m.architecture?.output_modalities; if (mods && !mods.includes('text')) continue;
+      catalogo[m.id] = { id: m.id, name: m.name.replace(/^([^:]+):\s*/, '$1 / '),
+        price: precioM(m.pricing?.prompt) + ' / ' + precioM(m.pricing?.completion),
+        reasoning: (m.supported_parameters || []).includes('reasoning') };
+    }
+  } catch (e) { $('#err').textContent = 'No pude leer el catálogo de OpenRouter; podés escribir el id del modelo igual.'; }
+  $('#catalogo').innerHTML = Object.values({ ...ESPECIALES, ...catalogo })
+    .map(m => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');
+  pintarFilas();
+}
+const info = id => ESPECIALES[id] || catalogo[id] || { id, name: id, price: '—', reasoning: true };
+
+// ---------------- filas de modelos ----------------
+const DEFAULT = [[JEV_ID, ''], ['anthropic/claude-fable-5.1', 'low'], ['openai/gpt-6-astra', 'low'], ['x-ai/grok-4.6', 'low']];
+let filas = (() => { try { return JSON.parse(ls.get('arena_filas')) || DEFAULT } catch (e) { return DEFAULT } })();
+const guardarFilas = () => ls.set('arena_filas', JSON.stringify(filas));
+const LOGO = id => {
+  const p = id.split('/')[0];
+  const t = { typesafe: ['J', '#2a2a2a'], anthropic: ['A', '#3b2a22'], openai: ['O', '#1f2f2a'], 'x-ai': ['X', '#222'], google: ['G', '#1f2638'],
+    deepseek: ['D', '#1f2540'], 'meta-llama': ['M', '#1f2638'], mistralai: ['M', '#3a2a1a'], qwen: ['Q', '#2a2140'], codigo: ['{}', '#1d2a14'] }[p];
+  return t || [p.slice(0, 1).toUpperCase(), '#222'];
+};
+// Picklist: modelos disponibles en OpenRouter, agrupados por proveedor
+function opcionesModelo(sel) {
+  const grupos = {};
+  for (const m of Object.values(catalogo)) {
+    if (m.id.includes(':') || m.id.startsWith('~')) continue;   // sin variantes batch/free ni alias
+    const prov = m.name.includes(' / ') ? m.name.split(' / ')[0] : m.id.split('/')[0];
+    (grupos[prov] ||= []).push(m);
+  }
+  const opt = m => `<option value="${esc(m.id)}" ${m.id === sel ? 'selected' : ''}>${esc(m.name.split(' / ').pop())}</option>`;
+  let html = `<optgroup label="Jev y control">${Object.values(ESPECIALES).map(opt).join('')}</optgroup>`;
+  if (!ESPECIALES[sel] && !catalogo[sel]) html += `<optgroup label="Elegido"><option value="${esc(sel)}" selected>${esc(sel)}</option></optgroup>`;
+  for (const p of Object.keys(grupos).sort((a, b) => a.localeCompare(b)))
+    html += `<optgroup label="${esc(p)}">${grupos[p].sort((a, b) => a.name.localeCompare(b.name)).map(opt).join('')}</optgroup>`;
+  return html;
+}
+function pintarFilas() {
+  $('#filas').innerHTML = filas.map(([id, r], i) => {
+    const m = info(id), [l, bg] = LOGO(id);
+    const opts = m.reasoning ? [['', '—'], ['low', 'Bajo'], ['medium', 'Medio'], ['high', 'Alto']] : [['', '—']];
+    return `<div class="tr" data-i="${i}">
+      <div class="m"><span class="logo" style="background:${bg}">${l}</span><select class="pick" data-k="id" aria-label="Modelo">${opcionesModelo(id)}</select><small>${esc(id)}</small></div>
+      <div class="price">${esc(m.price)}</div>
+      <div><select class="reason" data-k="r" ${m.reasoning ? '' : 'disabled'} aria-label="Razonamiento">${opts.map(([v, t]) => `<option value="${v}" ${v === (m.reasoning ? r : '') ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+      <div><button class="x" data-k="x" aria-label="Quitar">×</button></div></div>`;
+  }).join('');
+  $('#cuenta').textContent = `${filas.length} / 9 modelos seleccionados`;
+  $('#add').disabled = filas.length >= 9;
+}
+$('#filas').addEventListener('change', e => {
+  const i = +e.target.closest('.tr').dataset.i, k = e.target.dataset.k;
+  if (k === 'id') filas[i][0] = e.target.value.trim(); if (k === 'r') filas[i][1] = e.target.value;
+  guardarFilas(); pintarFilas();
+});
+$('#filas').addEventListener('click', e => {
+  if (e.target.dataset.k !== 'x') return;
+  filas.splice(+e.target.closest('.tr').dataset.i, 1); guardarFilas(); pintarFilas();
+});
+$('#add').onclick = () => { if (filas.length < 9) { filas.push([CODE_ID, '']); guardarFilas(); pintarFilas(); const s = $('#filas .tr:last-child select.pick'); s.focus(); try { s.showPicker(); } catch (e) {} } };
+
+// ---------------- OpenRouter: conexión (OAuth PKCE) ----------------
+let KEY = ls.get('arena_or_key');
+const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+async function conectar() {
+  const v = b64url(crypto.getRandomValues(new Uint8Array(32)));
+  const ch = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v)));
+  ss.set('arena_pkce', v);
+  location.href = `${OR}/auth?callback_url=${encodeURIComponent(location.origin + location.pathname)}&code_challenge=${ch}&code_challenge_method=S256`;
+}
+async function volverDeOAuth() {
+  const code = new URLSearchParams(location.search).get('code'); if (!code) return;
+  history.replaceState(null, '', location.pathname);
+  try {
+    const r = await fetch(OR + '/api/v1/auth/keys', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, code_verifier: ss.get('arena_pkce'), code_challenge_method: 'S256' }) });
+    const j = await r.json(); if (!j.key) throw new Error(JSON.stringify(j).slice(0, 160));
+    KEY = j.key; ls.set('arena_or_key', KEY);
+  } catch (e) { $('#err').textContent = 'No se pudo conectar OpenRouter: ' + e.message; }
+}
+function pintarStatus() {
+  const mask = KEY ? KEY.slice(0, 8) + '…' + KEY.slice(-4) : '';
+  $('#status').innerHTML = KEY
+    ? `<span class="ok">OpenRouter conectado</span><span class="note">· Catálogo en vivo · Cada partida consume saldo de tu cuenta.</span><button class="btn" id="desc">Desconectar</button>`
+    : `<span class="no">OpenRouter sin conectar</span><span class="note">· Sin clave solo juega "Solo código".</span><button class="btn" id="con">Conectar con OpenRouter</button>`;
+  $('#keyhelp').style.display = KEY ? 'none' : 'block';
+  $('#desc') && ($('#desc').onclick = () => { KEY = null; ls.set('arena_or_key', null); pintarStatus(); });
+  $('#con') && ($('#con').onclick = conectar);
+}
+
+// ---------------- tablero ----------------
+function rng(seed) { let a = 0; for (const ch of String(seed)) a = Math.imul(a ^ ch.charCodeAt(0), 2654435761) >>> 0;
+  return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function crearJuego(R, C, M, seed) {
+  const rnd = rng(seed), ini = [Math.floor(R / 2), Math.floor(C / 2)];
+  const libre = new Set(); for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) libre.add((ini[0] + a) + ',' + (ini[1] + b));
+  const celdas = []; for (let f = 0; f < R; f++) for (let c = 0; c < C; c++) if (!libre.has(f + ',' + c)) celdas.push([f, c]);
+  for (let i = celdas.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [celdas[i], celdas[j]] = [celdas[j], celdas[i]]; }
+  const minas = new Set(celdas.slice(0, M).map(([f, c]) => f + ',' + c));
+  return { R, C, M, seed, ini, minas };
+}
+class Tablero {
+  constructor(J, vidas) { Object.assign(this, { J, vidas, e: Array.from({ length: J.R }, () => Array(J.C).fill('h')), por: {} }); }
+  vec(f, c) { const o = []; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const x = f + a, y = c + b; if ((a || b) && x >= 0 && y >= 0 && x < this.J.R && y < this.J.C) o.push([x, y]); } return o; }
+  mina(f, c) { return this.J.minas.has(f + ',' + c); }
+  num(f, c) { return this.vec(f, c).filter(([x, y]) => this.mina(x, y)).length; }
+  revelar(f, c, quien) {
+    if (this.e[f]?.[c] !== 'h') return 'invalida';
+    this.por[f + ',' + c] = quien;
+    if (this.mina(f, c)) { this.e[f][c] = 'x'; this.vidas--; return 'mina'; }
+    const pila = [[f, c]];
+    while (pila.length) { const [x, y] = pila.pop(); if (this.e[x][y] !== 'h' || this.mina(x, y)) continue;
+      this.e[x][y] = 'r'; if (this.num(x, y) === 0) pila.push(...this.vec(x, y)); }
+    return 'ok';
+  }
+  bandera(f, c) { if (this.e[f]?.[c] === 'h') { this.e[f][c] = 'f'; return 'ok'; } return 'invalida'; }
+  seguras() { let n = 0; for (let f = 0; f < this.J.R; f++) for (let c = 0; c < this.J.C; c++) if (this.e[f][c] === 'r') n++; return n; }
+  ganado() { return this.seguras() === this.J.R * this.J.C - this.J.M; }
+  texto() {
+    const s = (f, c) => ({ h: '#', f: 'F', x: '*' }[this.e[f][c]] || (this.num(f, c) || '.'));
+    const cab = '    ' + [...Array(this.J.C).keys()].map(c => String(c).padStart(2)).join(' ');
+    return [cab, ...this.e.map((_, f) => String(f).padStart(2) + '  ' + this.e[f].map((_, c) => String(s(f, c)).padStart(2)).join(' '))].join('\n');
+  }
+  restricciones() {   // números revelados con sus vecinas ocultas y minas faltantes (conteo, no deducción)
+    const R = [];
+    for (let f = 0; f < this.J.R; f++) for (let c = 0; c < this.J.C; c++) {
+      if (this.e[f][c] !== 'r' || !this.num(f, c)) continue;
+      const v = this.vec(f, c), o = v.filter(([x, y]) => this.e[x][y] === 'h');
+      const b = v.filter(([x, y]) => this.e[x][y] === 'f' || this.e[x][y] === 'x').length;
+      if (o.length) R.push({ f, c, numero: this.num(f, c), falt: this.num(f, c) - b, o });
+    }
+    return R;
+  }
+}
+// Deducción exacta en código: regla de una restricción + regla de subconjunto
+function deducir(t) {
+  const R = t.restricciones().map(r => ({ ...r, s: new Set(r.o.map(p => p + '')) }));
+  const seg = new Set(), min = new Set();
+  for (const r of R) { if (r.falt === 0) r.s.forEach(k => seg.add(k)); if (r.falt === r.s.size) r.s.forEach(k => min.add(k)); }
+  if (!seg.size && !min.size) for (const a of R) for (const b of R) {
+    if (a === b || a.s.size >= b.s.size || ![...a.s].every(k => b.s.has(k))) continue;
+    const d = [...b.s].filter(k => !a.s.has(k));
+    if (b.falt === a.falt) d.forEach(k => seg.add(k)); if (b.falt - a.falt === d.length) d.forEach(k => min.add(k));
+  }
+  const p = k => k.split(',').map(Number);
+  return { seg: [...seg].map(p), min: [...min].map(p) };
+}
+
+// ---------------- jugadores ----------------
+const REGLAS = J => `Buscaminas ${J.R}x${J.C} con ${J.M} minas. Filas y columnas numeradas desde 0. Símbolos: # oculta, F bandera, . revelada sin minas vecinas, 1-8 cantidad de minas en las 8 vecinas, * mina que ya explotó. Revelar una mina cuesta una vida. Ganás cuando revelaste todas las celdas sin mina. Las banderas son opcionales.`;
+async function post(path, body) {
+  const r = await fetch(OR + path, { method: 'POST', headers: { Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json',
+    'HTTP-Referer': location.origin, 'X-Title': 'Arena Buscaminas' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.error) throw new Error((j.error?.message || ('HTTP ' + r.status)).slice(0, 160));
+  return j;
+}
+// Código: lo demostrable. Devuelve null si está trabado.
+function turnoCodigo(t) {
+  const d = deducir(t); if (!d.seg.length && !d.min.length) return null;
+  return { jugadas: [...d.min.map(p => ['bandera', ...p, 'codigo']), ...d.seg.map(p => ['revelar', ...p, 'codigo'])],
+    txt: `Código: ${d.seg.length} seguras, ${d.min.length} minas demostradas` };
+}
+async function jugarCodigoSolo(t, P) {
+  const r = turnoCodigo(t); if (r) return r;
+  const ocultas = []; t.e.forEach((fila, f) => fila.forEach((v, c) => v === 'h' && ocultas.push([f, c])));
+  const p = ocultas[Math.floor(Math.random() * ocultas.length)];
+  return { jugadas: [['revelar', ...p, 'azar']], txt: `Trabado: arriesga al azar en (${p})` };
+}
+async function jugarJev(t, P) {
+  const r = turnoCodigo(t); if (r) return r;
+  // Trabado: Jev elige la celda candidata de menor riesgo (primitivo choice, una sola pregunta)
+  const R = t.restricciones(), hechos = {};
+  for (const x of R) for (const p of x.o) (hechos[p] ||= []).push({ numero: x.numero, minas_faltantes: x.falt, vecinas_ocultas: x.o.length });
+  let cand = Object.keys(hechos).sort((a, b) => hechos[b].length - hechos[a].length).slice(0, 12);
+  const ocultas = []; t.e.forEach((fila, f) => fila.forEach((v, c) => v === 'h' && ocultas.push(f + ',' + c)));
+  const interior = ocultas.find(k => !hechos[k]); if (interior) cand.push(interior);
+  const marcadas = t.e.flat().filter(v => v === 'f' || v === 'x').length;
+  const crit = {}; cand.forEach((k, i) => { crit['c' + i] = { celda: k.split(',').map(Number),
+    restricciones_vecinas: hechos[k] || 'ninguna: no toca ningún número revelado' }; });
+  const st = { reglas: REGLAS(t.J), minas_sin_marcar: t.J.M - marcadas, celdas_ocultas: ocultas.length,
+    densidad_de_minas_en_ocultas: +((t.J.M - marcadas) / ocultas.length).toFixed(3) };
+  const j = await post('/api/alpha/decisions', { model: JEV_ID, state: JSON.stringify(st), questions: { celda: { type: 'choice',
+    instructions: 'No hay ninguna jugada segura demostrable. Elegí la celda oculta con MENOR probabilidad de ser mina. Cada restricción vecina es un número revelado: minas_faltantes es cuántas minas quedan entre sus vecinas_ocultas. Una celda sin restricciones tiene la densidad global de minas.', criteria: crit } } });
+  const a = j.answers?.celda, k = a?.choice; if (!crit[k]) throw new Error('Jev devolvió una opción inválida');
+  P.costo += j.usage?.cost || 0; P.llamadas++;
+  const [f, c] = crit[k].celda, pr = a.probabilities?.[k];
+  return { jugadas: [['revelar', f, c, 'jev']], txt: `Jev eligió (${f},${c}) entre ${cand.length} candidatas${pr != null ? ' · confianza ' + pr.toFixed(2) : ''}` };
+}
+async function jugarLLM(t, P) {
+  const prompt = `${REGLAS(t.J)}\n\nVidas restantes: ${t.vidas}\nTablero actual:\n${t.texto()}\n\nDecidí tus próximas jugadas. Podés hacer varias en este turno si son lógicamente seguras. Respondé SOLO con JSON: {"jugadas":[{"accion":"revelar"|"bandera","fila":n,"col":n}]}`;
+  const body = { model: P.id, messages: [{ role: 'user', content: prompt }], max_tokens: 32000, usage: { include: true } };
+  if (P.r) body.reasoning = { effort: P.r };
+  const j = await post('/api/v1/chat/completions', body);
+  P.costo += j.usage?.cost || 0; P.llamadas++;
+  const txt = j.choices?.[0]?.message?.content || '', m = txt.match(/\{[\s\S]*\}/);
+  let jug = []; try { jug = (JSON.parse(m[0]).jugadas || []); } catch (e) {}
+  jug = jug.filter(x => x && (x.accion === 'revelar' || x.accion === 'bandera')).map(x => [x.accion, x.fila, x.col, 'llm']);
+  return { jugadas: jug, txt: jug.length ? `${jug.length} jugada(s): ` + jug.slice(0, 6).map(x => `${x[0][0]}(${x[1]},${x[2]})`).join(' ') : 'Respuesta sin jugadas válidas' };
+}
+
+// Simulación: sin IA ni red. Jev simulado elige la candidata con menor proporción local de minas;
+// los modelos simulados deducen con código y, si se traban, arriesgan al azar, con demoras de un modelo real.
+async function simJev(t, P) {
+  const r = turnoCodigo(t); if (r) return r;
+  await sleep(250 + Math.random() * 150);
+  const R = t.restricciones(), riesgo = {};
+  for (const x of R) for (const p of x.o) riesgo[p] = Math.max(riesgo[p] ?? 0, x.falt / x.o.length);
+  const ocultas = []; t.e.forEach((fila, f) => fila.forEach((v, c) => v === 'h' && ocultas.push(f + ',' + c)));
+  const marcadas = t.e.flat().filter(v => v === 'f' || v === 'x').length, dens = (t.J.M - marcadas) / ocultas.length;
+  const k = ocultas.map(k => [k, riesgo[k] ?? dens]).sort((a, b) => a[1] - b[1])[0][0];
+  P.llamadas++; const [f, c] = k.split(',').map(Number);
+  return { jugadas: [['revelar', f, c, 'jev']], txt: `Jev (simulado) eligió (${f},${c})` };
+}
+async function simLLM(t, P) {
+  await sleep(2000 + Math.random() * 5000); P.llamadas++;
+  const r = turnoCodigo(t); if (r) return { ...r, jugadas: r.jugadas.map(j => [...j.slice(0, 3), 'llm']), txt: `(simulado) ${r.jugadas.length} jugada(s)` };
+  const ocultas = []; t.e.forEach((fila, f) => fila.forEach((v, c) => v === 'h' && ocultas.push([f, c])));
+  const p = ocultas[Math.floor(Math.random() * ocultas.length)];
+  return { jugadas: [['revelar', ...p, 'llm']], txt: `(simulado) arriesga en (${p})` };
+}
+
+// ---------------- partida ----------------
+let SIM = false;
+let JUEGO = null, corrida = 0;
+function cfg() {
+  const R = +$('#filasN').value, C = +$('#colsN').value, M = +$('#minasN').value, V = 3;
+  if (!(R >= 5 && R <= 30 && C >= 5 && C <= 30)) return 'Filas y columnas: entre 5 y 30.';
+  if (!(M >= 1 && M <= R * C - 9)) return `Minas: entre 1 y ${R * C - 9}.`;
+  return { R, C, M, V };
+}
+async function cuentaRegresiva() {
+  const el = $('#cuentaReg'); el.classList.add('on');
+  for (const n of ['3', '2', '1', '¡Ya!']) { el.innerHTML = `<b class="${n === '¡Ya!' ? 'ya' : ''}">${n}</b>`; await sleep(n === '¡Ya!' ? 550 : 850); }
+  el.classList.remove('on'); el.innerHTML = '';
+}
+function confeti(panel) {   // confeti sobre el tablero del modelo que resolvió
+  const cv = document.createElement('canvas'); cv.className = 'conf'; panel.appendChild(cv);
+  const r = panel.getBoundingClientRect(), dpr = devicePixelRatio || 1;
+  cv.width = r.width * dpr; cv.height = r.height * dpr; const g = cv.getContext('2d'); g.scale(dpr, dpr);
+  const cols = ['#b6f36a', '#ffd25e', '#b78cff', '#7fd3ff', '#ff8a8a', '#ffffff'];
+  const ps = Array.from({ length: 140 }, () => ({ x: r.width / 2 + (Math.random() - .5) * 60, y: r.height * .35,
+    vx: (Math.random() - .5) * 9, vy: -Math.random() * 9 - 3, s: 4 + Math.random() * 5, a: Math.random() * 6, va: (Math.random() - .5) * .4,
+    c: cols[Math.floor(Math.random() * cols.length)] }));
+  const t0 = performance.now();
+  (function paso(t) {
+    const dt = t - t0; g.clearRect(0, 0, r.width, r.height);
+    for (const p of ps) { p.vy += .22; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.a += p.va;
+      g.save(); g.translate(p.x, p.y); g.rotate(p.a); g.globalAlpha = Math.max(0, 1 - dt / 3200); g.fillStyle = p.c; g.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2); g.restore(); }
+    if (dt < 3200) requestAnimationFrame(paso); else cv.remove();
+  })(t0);
+}
+async function empezar(mismo, sim = SIM) {
+  SIM = sim;
+  const k = cfg(); if (typeof k === 'string') { $('#err').textContent = k; return; }
+  const ids = filas.map(f => f[0]).filter(Boolean);
+  if (!ids.length) { $('#err').textContent = 'Agregá al menos un modelo.'; return; }
+  if (!SIM && !KEY && ids.some(id => id !== CODE_ID)) { $('#err').textContent = 'Conectá OpenRouter para jugar con modelos de IA (o dejá solo "Solo código").'; return; }
+  $('#err').textContent = '';
+  if (!mismo || !JUEGO || JUEGO.R !== k.R || JUEGO.C !== k.C || JUEGO.M !== k.M)
+    JUEGO = crearJuego(k.R, k.C, k.M, new URLSearchParams(location.search).get('semilla') || Math.random().toString(36).slice(2, 8));
+  const id = ++corrida;
+  $('#setup').style.display = 'none'; $('#juego').style.display = 'block'; scrollTo(0, 0);
+  $('#titJuego').textContent = `${SIM ? 'Simulación (sin IA real)' : 'Partida'} · ${JUEGO.R}×${JUEGO.C} · ${JUEGO.M} minas · semilla ${JUEGO.seed}`;
+  const P = filas.filter(f => f[0]).map(([pid, r], i) => ({ i, id: pid, r: info(pid).reasoning ? r : '', nombre: info(pid).name,
+    t: new Tablero(JUEGO, k.V), t0: performance.now(), fin: null, costo: 0, llamadas: 0, estado: 'jugando', last: 'Arrancando…', nuevas: new Set() }));
+  P.forEach(p => p.t.revelar(...JUEGO.ini, 'inicio'));
+  $('#paneles').innerHTML = P.map(p => `<div class="pn" id="pn${p.i}"></div>`).join('');
+  P.forEach(pintarPanel); pintarRes(P);
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) await cuentaRegresiva();
+  if (id !== corrida) return;
+  P.forEach(p => p.t0 = performance.now());   // el reloj arranca después del "¡Ya!"
+  const reloj = setInterval(() => { if (id !== corrida) return clearInterval(reloj); P.forEach(pintarCab); pintarRes(P); }, 500);
+  Promise.all(P.map(p => correr(p, id))).then(() => { clearInterval(reloj); P.forEach(pintarCab); pintarRes(P, true); });
+}
+async function correr(P, id) {
+  const jugador = P.id === CODE_ID ? jugarCodigoSolo : P.id === JEV_ID ? (SIM ? simJev : jugarJev) : (SIM ? simLLM : jugarLLM);
+  const t = P.t, tope = t.J.R * t.J.C + 20; let turnos = 0, sinAvance = 0, errores = 0;
+  while (id === corrida && t.vidas > 0 && !t.ganado() && turnos < tope && performance.now() - P.t0 < 15 * 60e3) {
+    turnos++; let r;
+    try { r = await jugador(t, P); errores = 0; }
+    catch (e) { P.last = '⚠ ' + e.message; pintarPanel(P); if (++errores >= 3) { P.estado = 'error'; break; } await sleep(1500); continue; }
+    if (id !== corrida) return;
+    let avance = false; P.nuevas = new Set();
+    for (const [acc, f, c, quien] of r.jugadas.slice(0, 60)) {
+      if (!Number.isInteger(f) || !Number.isInteger(c)) continue;
+      const res = acc === 'revelar' ? t.revelar(f, c, quien) : t.bandera(f, c);
+      if (res !== 'invalida') { avance = true; P.nuevas.add(f + ',' + c); }
+      if (res === 'mina' || t.ganado()) break;
+    }
+    P.last = r.txt; sinAvance = avance ? 0 : sinAvance + 1;
+    pintarPanel(P);
+    if (sinAvance >= 3) break;
+    if (P.id === CODE_ID || r.jugadas[0]?.[3] === 'codigo') await sleep(180);   // para que se vea
+  }
+  P.fin = (performance.now() - P.t0) / 1000;
+  P.estado = t.ganado() ? 'resuelto' : t.vidas <= 0 ? 'sin vidas' : P.estado === 'error' ? 'error' : 'incompleto';
+  pintarPanel(P);
+  if (P.estado === 'resuelto' && id === corrida && !matchMedia('(prefers-reduced-motion: reduce)').matches) confeti($('#pn' + P.i));
+}
+const segT = P => (P.fin ?? (performance.now() - P.t0) / 1000);
+function pintarCab(P) {
+  const el = $('#pn' + P.i); if (!el) return;
+  const tot = P.t.J.R * P.t.J.C - P.t.J.M;
+  el.querySelector('.stats').innerHTML = `<span>Tiempo<b>${fmtT(segT(P))}</b></span><span>Costo<b>$${fmt$(P.costo)}</b></span><span>Vidas<b>${'♥'.repeat(Math.max(P.t.vidas, 0)) || '0'}</b></span><span>Celdas<b>${P.t.seguras()}/${tot}</b></span>`;
+}
+function pintarPanel(P) {
+  const el = $('#pn' + P.i), t = P.t;
+  const tag = { jugando: '<span class="tag run">jugando</span>', resuelto: '<span class="tag ok">resuelto</span>', 'sin vidas': '<span class="tag bad">sin vidas</span>' }[P.estado] || `<span class="tag">${P.estado}</span>`;
+  el.className = 'pn' + (P.estado === 'resuelto' ? ' win' : P.estado === 'sin vidas' ? ' lose' : '');
+  let cells = '';
+  for (let f = 0; f < t.J.R; f++) for (let c = 0; c < t.J.C; c++) {
+    const v = t.e[f][c], k = f + ',' + c, n = v === 'r' ? t.num(f, c) : 0;
+    cells += `<div class="c ${v === 'h' ? '' : v}${t.por[k] === 'jev' ? ' j' : ''}${P.nuevas.has(k) ? ' new' : ''}${n ? ' n' + n : ''}">${n || ''}</div>`;
+  }
+  el.innerHTML = `<div class="pn-h"><b title="${esc(P.id)}">${esc(P.nombre)}${P.r ? ' · ' + { low: 'bajo', medium: 'medio', high: 'alto' }[P.r] : ''}</b>${tag}</div>
+    <div class="stats"></div>
+    <div class="bd" style="grid-template-columns:repeat(${t.J.C},1fr);grid-template-rows:repeat(${t.J.R},1fr);--ar:${t.J.C}/${t.J.R}">${cells}</div>
+    <div class="last">${esc(P.last)} · ${P.llamadas} llamada(s)</div>`;
+  pintarCab(P);
+}
+function pintarRes(P, final) {
+  const orden = [...P].sort((a, b) => (b.estado === 'resuelto') - (a.estado === 'resuelto') || b.t.seguras() - a.t.seguras() || segT(a) - segT(b));
+  const tot = JUEGO.R * JUEGO.C - JUEGO.M;
+  $('#res').innerHTML = orden.map(p => `<tr><td>${esc(p.nombre)}</td><td>${esc(p.estado)}</td><td>${p.t.seguras()} / ${tot}</td><td>${Math.max(p.t.vidas, 0)}</td><td>${fmtT(segT(p))}</td><td>$${fmt$(p.costo)}</td><td>${p.llamadas}</td></tr>`).join('');
+  $('#nota').textContent = SIM ? 'Simulación: jugadores falsos, sin IA real ni costo. Sirve para ver la pantalla y el tablero; no compara modelos.' : final ? 'Una partida es una muestra chica: los modelos (y Jev) varían entre corridas. Para comparar en serio, jugá varias veces el mismo tablero o varios tableros.' : 'Jugando… los resultados se completan al terminar.';
+}
+$('#jugar').onclick = () => empezar(false, false);
+$('#simular').onclick = () => empezar(false, true);
+$('#otra').onclick = () => empezar(true);
+$('#nuevo').onclick = () => empezar(false);
+$('#minasN').addEventListener('input', () => { const k = cfg();
+  $('#minasHint').textContent = typeof k === 'string' ? k : `${Math.round(100 * k.M / (k.R * k.C))}% del tablero. Más minas = más veces hay que arriesgar.`; });
+$('#volver').onclick = () => { corrida++; $('#juego').style.display = 'none'; $('#setup').style.display = 'block'; };
+
+// ---------------- arranque ----------------
+(async () => { await volverDeOAuth(); pintarStatus(); pintarFilas(); cargarCatalogo(); })();
+</script>
+</body>
+</html>
