@@ -256,12 +256,17 @@ async function volverDeOAuth() {
     KEY = j.key; ls.set('arena_or_key', KEY);
   } catch (e) { $('#err').textContent = 'No se pudo conectar OpenRouter: ' + e.message; }
 }
+let HOST = false;   // ¿el sitio tiene cuenta anfitriona? (Cloudflare Pages Function)
+async function detectarAnfitrion() {
+  try { const r = await fetch('api/or/estado'); HOST = r.ok && (await r.json()).anfitrion === true; } catch (e) { HOST = false; }
+}
 function pintarStatus() {
-  const mask = KEY ? KEY.slice(0, 8) + '…' + KEY.slice(-4) : '';
   $('#status').innerHTML = KEY
     ? `<span class="ok">OpenRouter conectado</span><span class="note">· Catálogo en vivo · Cada partida consume saldo de tu cuenta.</span><button class="btn" id="desc">Desconectar</button>`
-    : `<span class="no">OpenRouter sin conectar</span><span class="note">· Sin clave solo juega "Solo código".</span><button class="btn" id="con">Conectar con OpenRouter</button>`;
-  $('#keyhelp').style.display = KEY ? 'none' : 'block';
+    : HOST
+    ? `<span class="ok">Listo para jugar</span><span class="note">· Por ahora las partidas corren con la cuenta de la arena.</span><button class="btn" id="con">Usar mi cuenta de OpenRouter</button>`
+    : `<span class="no">OpenRouter sin conectar</span><span class="note">· Sin conexión solo juega "Solo código".</span><button class="btn" id="con">Conectar con OpenRouter</button>`;
+  $('#keyhelp').style.display = KEY || HOST ? 'none' : 'block';
   $('#desc') && ($('#desc').onclick = () => { KEY = null; ls.set('arena_or_key', null); pintarStatus(); });
   $('#con') && ($('#con').onclick = conectar);
 }
@@ -327,8 +332,11 @@ function deducir(t) {
 // ---------------- jugadores ----------------
 const REGLAS = J => `Buscaminas ${J.R}x${J.C} con ${J.M} minas. Filas y columnas numeradas desde 0. Símbolos: # oculta, F bandera, . revelada sin minas vecinas, 1-8 cantidad de minas en las 8 vecinas, * mina que ya explotó. Revelar una mina cuesta una vida. Ganás cuando revelaste todas las celdas sin mina. Las banderas son opcionales.`;
 async function post(path, body) {
-  const r = await fetch(OR + path, { method: 'POST', headers: { Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json',
-    'HTTP-Referer': location.origin, 'X-Title': 'Arena Buscaminas' }, body: JSON.stringify(body) });
+  // Con cuenta propia: directo a OpenRouter. Sin ella: por la cuenta anfitriona del sitio (/api/or), si existe.
+  const r = KEY
+    ? await fetch(OR + path, { method: 'POST', headers: { Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json',
+        'HTTP-Referer': location.origin, 'X-Title': 'Arena Buscaminas' }, body: JSON.stringify(body) })
+    : await fetch('api/or' + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
   if (!r.ok || j.error) throw new Error((j.error?.message || ('HTTP ' + r.status)).slice(0, 160));
   return j;
@@ -433,7 +441,7 @@ async function empezar(mismo, sim = SIM) {
   const k = cfg(); if (typeof k === 'string') { $('#err').textContent = k; return; }
   const ids = filas.map(f => f[0]).filter(Boolean);
   if (!ids.length) { $('#err').textContent = 'Agregá al menos un modelo.'; return; }
-  if (!SIM && !KEY && ids.some(id => id !== CODE_ID)) { $('#err').textContent = 'Conectá OpenRouter para jugar con modelos de IA (o dejá solo "Solo código").'; return; }
+  if (!SIM && !KEY && !HOST && ids.some(id => id !== CODE_ID)) { $('#err').textContent = 'Conectá OpenRouter para jugar con modelos de IA (o dejá solo "Solo código").'; return; }
   $('#err').textContent = '';
   if (!mismo || !JUEGO || JUEGO.R !== k.R || JUEGO.C !== k.C || JUEGO.M !== k.M)
     JUEGO = crearJuego(k.R, k.C, k.M, new URLSearchParams(location.search).get('semilla') || Math.random().toString(36).slice(2, 8));
@@ -512,7 +520,7 @@ $('#minasN').addEventListener('input', () => { const k = cfg();
 $('#volver').onclick = () => { corrida++; $('#juego').style.display = 'none'; $('#setup').style.display = 'block'; };
 
 // ---------------- arranque ----------------
-(async () => { await volverDeOAuth(); pintarStatus(); pintarFilas(); cargarCatalogo(); })();
+(async () => { await volverDeOAuth(); await detectarAnfitrion(); pintarStatus(); pintarFilas(); cargarCatalogo(); })();
 </script>
 </body>
 </html>
