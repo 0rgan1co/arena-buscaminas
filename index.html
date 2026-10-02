@@ -77,9 +77,14 @@ body.playing #juego{height:100vh;height:100dvh;display:flex;flex-direction:colum
 .bd{flex:1 1 auto;min-height:0;max-width:100%;max-height:100%;margin:0 auto;height:auto;width:auto}
 .tabwrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;container-type:size}
 .tabwrap .bd{width:min(100cqw,100cqh * var(--arn));height:auto}
-#resModal{position:fixed;inset:0;background:rgba(8,8,10,.8);display:none;place-items:center;z-index:40;padding:16px}
-#resModal.on{display:grid}
-#resModal .caja{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:20px;width:min(900px,100%);max-height:90vh;overflow:auto}
+#resModal,#expModal{position:fixed;inset:0;background:rgba(8,8,10,.8);display:none;place-items:center;z-index:40;padding:16px}
+#resModal.on,#expModal.on{display:grid}#expModal{z-index:45}
+.exp{font-size:14px;line-height:1.6;color:#cfcfd4}
+.exp h3{font-size:15px;margin:18px 0 6px;color:var(--txt);display:flex;gap:8px;align-items:center}
+.exp p{margin:6px 0}.exp ul{margin:6px 0;padding-left:20px}.exp li{margin:3px 0}
+.exp .k{font-family:var(--mono);font-size:12px;color:var(--mut)}
+.exp .clave{border-left:3px solid var(--jev);padding:8px 12px;background:#17171b;border-radius:0 4px 4px 0;margin:10px 0}
+#resModal .caja,#expModal .caja{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:20px;width:min(900px,100%);max-height:90vh;overflow:auto}
 .pn{border:1px solid var(--line);border-radius:6px;background:var(--panel);padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0}
 .pn.win{border-color:var(--ok)}.pn.lose{border-color:#5a2a2a}
 .pn-h{display:flex;justify-content:space-between;align-items:center;gap:8px}
@@ -150,12 +155,18 @@ footer.wrap{padding:28px 16px 60px;color:var(--dim);font-size:12px;font-family:v
   <div class="topbar">
     <div class="lbl"><i style="background:var(--jev)"></i><span id="titJuego">Partida</span></div>
     <div class="legend"><span><i style="background:var(--cellr)"></i>revelada</span><span><i style="box-shadow:inset 0 0 0 2px var(--jev);background:var(--cellr)"></i>decisión de Jev</span><span><i style="background:var(--bad)"></i>mina</span><span>⚑ bandera</span></div>
-    <div class="go"><button class="btn" id="verRes">Resultados</button><button class="btn" id="otra">Otra vez</button><button class="btn" id="nuevo">Nuevo tablero</button><button class="btn" id="volver">Configurar</button></div>
+    <div class="go"><button class="btn" id="explicar" style="border-color:var(--jev);color:var(--jev)">¿Por qué pasó?</button><button class="btn" id="verRes">Resultados</button><button class="btn" id="otra">Otra vez</button><button class="btn" id="nuevo">Nuevo tablero</button><button class="btn" id="volver">Configurar</button></div>
   </div>
   <div class="grid" id="paneles"></div>
+  <div id="expModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="expTit">
+    <div class="caja">
+      <div class="row-h"><div class="lbl" id="expTit"><i style="background:var(--jev)"></i>¿Por qué pasó lo que pasó?</div><button class="btn" id="cerrarExp">Cerrar</button></div>
+      <div id="expBody" class="exp"></div>
+    </div>
+  </div>
   <div id="resModal" role="dialog" aria-modal="true" aria-labelledby="resTit">
     <div class="caja">
-      <div class="row-h"><div class="lbl" id="resTit"><i style="background:var(--ok)"></i>Resultados</div><button class="btn" id="cerrarRes">Cerrar</button></div>
+      <div class="row-h"><div class="lbl" id="resTit"><i style="background:var(--ok)"></i>Resultados</div><div class="go"><button class="btn" id="explicar2" style="border-color:var(--jev);color:var(--jev)">¿Por qué pasó?</button><button class="btn" id="cerrarRes">Cerrar</button></div></div>
       <div class="scroll"><table class="res"><thead><tr><th>Modelo</th><th>Resultado</th><th>Celdas seguras</th><th>Vidas</th><th>Tiempo</th><th>Costo USD</th><th>Llamadas</th></tr></thead><tbody id="res"></tbody></table></div>
       <p class="note" id="nota" style="margin-top:12px;line-height:1.6"></p>
     </div>
@@ -332,11 +343,11 @@ class Tablero {
   }
 }
 // Deducción exacta en código: regla de una restricción + regla de subconjunto
-function deducir(t) {
+function deducir(t, todo = false) {   // todo=true aplica siempre las dos reglas (para la explicación)
   const R = t.restricciones().map(r => ({ ...r, s: new Set(r.o.map(p => p + '')) }));
   const seg = new Set(), min = new Set();
   for (const r of R) { if (r.falt === 0) r.s.forEach(k => seg.add(k)); if (r.falt === r.s.size) r.s.forEach(k => min.add(k)); }
-  if (!seg.size && !min.size) for (const a of R) for (const b of R) {
+  if (todo || (!seg.size && !min.size)) for (const a of R) for (const b of R) {
     if (a === b || a.s.size >= b.s.size || ![...a.s].every(k => b.s.has(k))) continue;
     const d = [...b.s].filter(k => !a.s.has(k));
     if (b.falt === a.falt) d.forEach(k => seg.add(k)); if (b.falt - a.falt === d.length) d.forEach(k => min.add(k));
@@ -422,6 +433,66 @@ async function simLLM(t, P) {
   return { jugadas: [['revelar', ...p, 'llm']], txt: `(simulado) arriesga en (${p})` };
 }
 
+// ---------------- explicación: qué pasó y por qué ----------------
+// Antes de cada jugada el código mira si había una jugada demostrable (con sus dos reglas).
+function registrar(P, t, acc, f, c, quien) {
+  const g = P.reg;
+  if (quien === 'codigo') g.codigo++; if (quien === 'jev') g.jev++;
+  if (acc === 'bandera') { if (t.e[f]?.[c] === 'h') t.mina(f, c) ? g.bandBien++ : g.bandMal++; return; }
+  if (t.e[f]?.[c] !== 'h') return;
+  const d = deducir(t, true), segura = quien === 'codigo' || d.seg.some(([x, y]) => x === f && y === c), trabado = !d.seg.length && !d.min.length;
+  if (segura) g.seguras++; else { g.riesgos++; if (trabado) g.forzados++; }
+  if (t.mina(f, c)) g.minas.push({ f, c, nSeg: d.seg.length, quien });
+}
+function soloLogica(J) {   // ¿se resuelve este tablero sin arriesgar nunca?
+  const t = new Tablero(J, 99); t.revelar(...J.ini, 'x');
+  for (let i = 0; i < 500 && !t.ganado(); i++) { const d = deducir(t); if (!d.seg.length && !d.min.length) break;
+    d.min.forEach(p => t.bandera(...p)); d.seg.forEach(p => t.revelar(...p, 'x')); }
+  return { gana: t.ganado(), celdas: t.seguras(), tot: J.R * J.C - J.M };
+}
+let PARTIDA = [];
+function explicar() {
+  const P = PARTIDA; if (!P.length) return;
+  const J = JUEGO, L = soloLogica(J), tot = L.tot;
+  const fin = P.every(p => p.estado !== 'jugando'), ganadores = P.filter(p => p.estado === 'resuelto');
+  const nom = p => esc(p.nombre);
+  let h = SIM ? `<p class="clave"><b>Esto fue una simulación:</b> los jugadores son falsos. Sirve para ver cómo se lee la explicación, no para sacar conclusiones sobre los modelos.</p>` : '';
+  h += `<h3>El tablero</h3><p>${J.R}×${J.C} con ${J.M} minas (${Math.round(100 * J.M / (J.R * J.C))}% de las celdas). `;
+  h += L.gana ? `<b>Se podía ganar sin arriesgar nunca:</b> usando solo lógica (las dos reglas del código) se resuelve completo. Cualquier mina pisada acá fue un error evitable.</p>`
+              : `<b>No se podía ganar solo con lógica:</b> con las dos reglas del código se llega a ${L.celdas} de ${tot} celdas y después hay que arriesgar sí o sí. En esos momentos entra el criterio (o la suerte).</p>`;
+  if (!fin) h += `<p class="k">La partida sigue en curso: la explicación se completa al terminar.</p>`;
+  h += `<div class="clave">${ganadores.length ? `<b>Resolvieron el tablero:</b> ${ganadores.map(nom).join(', ')}.` : '<b>Nadie resolvió el tablero.</b>'} `;
+  const evitables = P.filter(p => p.reg.minas.some(m => m.nSeg > 0));
+  if (evitables.length) h += `Pisaron minas teniendo jugadas seguras disponibles: ${evitables.map(nom).join(', ')}.`;
+  h += `</div>`;
+  for (const p of P) {
+    const g = p.reg, malas = g.minas.filter(m => m.nSeg > 0), forz = g.minas.filter(m => !m.nSeg);
+    h += `<h3>${nom(p)} <span class="tag ${p.estado === 'resuelto' ? 'ok' : p.estado === 'sin vidas' ? 'bad' : ''}">${esc(p.estado)}</span></h3><ul>`;
+    h += `<li>Destapó ${p.t.seguras()} de ${tot} celdas en ${fmtT(segT(p))}, con un costo de $${fmt$(p.costo)} en ${p.llamadas} llamada(s).</li>`;
+    h += `<li>De sus ${g.seguras + g.riesgos} jugadas de destapar, <b>${g.seguras} eran demostrablemente seguras</b> y ${g.riesgos} fueron riesgos${g.riesgos ? ` (${g.forzados} sin ninguna jugada segura disponible)` : ''}.</li>`;
+    if (p.id === JEV_ID) h += `<li>Trabajo en equipo: el código hizo ${g.codigo} jugadas demostrables y <b>Jev decidió ${g.jev} vez/veces</b>, solo cuando había que arriesgar.</li>`;
+    if (malas.length) h += `<li><b>Error evitable:</b> pisó ${malas.length} mina(s) habiendo jugadas seguras disponibles (${malas.map(m => `(${m.f},${m.c}) con ${m.nSeg} seguras a mano`).join('; ')}). No fue mala suerte: fue un error de razonamiento.</li>`;
+    if (forz.length) h += `<li>Pisó ${forz.length} mina(s) en momentos sin ninguna jugada segura (${forz.map(m => `(${m.f},${m.c})`).join(', ')}): ahí había que arriesgar y salió mal.</li>`;
+    if (g.bandMal) h += `<li>Puso ${g.bandMal} bandera(s) en celdas sin mina: eso confunde sus propias cuentas de las jugadas siguientes.</li>`;
+    if (g.invalidas) h += `<li>${g.invalidas} jugada(s) inválidas (celdas ya abiertas o fuera del tablero): el modelo leyó mal el estado del tablero.</li>`;
+    if (g.errores.length) h += `<li>Errores de conexión o de la API: ${esc([...new Set(g.errores)].slice(0, 2).join(' · '))}.</li>`;
+    if (p.estado === 'incompleto') h += `<li>Se detuvo antes de terminar: pasaron 3 turnos seguidos sin una jugada válida o se acabó el tiempo.</li>`;
+    let d = p.estado === 'resuelto' && !g.riesgos ? 'Ganó usando solo jugadas demostrables.'
+      : p.estado === 'resuelto' ? `Ganó, pero tuvo que arriesgar ${g.riesgos} vez/veces${forz.length ? ' y no siempre salió bien' : ''}.`
+      : malas.length ? 'Lo que lo frenó fueron errores evitables, no la dificultad del tablero.'
+      : forz.length ? 'Sus vidas se fueron en momentos sin salida segura: le tocó arriesgar y perdió.' : '';
+    if (d) h += `<li><b>En una frase:</b> ${d}</li>`;
+    h += `</ul>`;
+  }
+  const term = P.filter(p => p.estado === 'resuelto');
+  if (term.length > 1) {
+    const rap = [...term].sort((a, b) => segT(a) - segT(b))[0], bar = [...term].sort((a, b) => a.costo - b.costo)[0];
+    h += `<h3>Eficiencia entre los que resolvieron</h3><p>Más rápido: <b>${nom(rap)}</b> (${fmtT(segT(rap))}). Más barato: <b>${nom(bar)}</b> ($${fmt$(bar.costo)}).</p>`;
+  }
+  h += `<p class="k" style="margin-top:16px">Cómo se calcula: antes de cada jugada, el código revisa si existía una celda segura demostrable con dos reglas (un número con todas sus minas marcadas, y la comparación entre dos números vecinos). Si el jugador destapó una celda que no estaba en esa lista, cuenta como riesgo. Hay deducciones más profundas que estas reglas no ven, así que "riesgo" quiere decir "no demostrable con estas reglas". Una sola partida es una observación, no un ranking.</p>`;
+  $('#expBody').innerHTML = h; $('#expModal').classList.add('on');
+}
+
 // ---------------- partida ----------------
 let SIM = false;
 let JUEGO = null, corrida = 0;
@@ -463,13 +534,14 @@ async function empezar(mismo, sim = SIM) {
     JUEGO = crearJuego(k.R, k.C, k.M, new URLSearchParams(location.search).get('semilla') || Math.random().toString(36).slice(2, 8));
   const id = ++corrida;
   $('#setup').style.display = 'none'; $('#juego').style.display = 'flex'; document.body.classList.add('playing'); scrollTo(0, 0);
-  $('#resModal').classList.remove('on');
+  $('#resModal').classList.remove('on'); $('#expModal').classList.remove('on');
   const nP = filas.filter(f => f[0]).length, cols = nP <= 5 ? nP : Math.ceil(nP / 2);   // hasta 5 en una fila; más, en dos
   $('#paneles').style.setProperty('--cols', cols); $('#paneles').style.setProperty('--filas', Math.ceil(nP / cols));
   $('#titJuego').textContent = `${SIM ? 'Simulación (sin IA real)' : 'Partida'} · ${JUEGO.R}×${JUEGO.C} · ${JUEGO.M} minas · semilla ${JUEGO.seed}`;
   const P = filas.filter(f => f[0]).map(([pid, r], i) => ({ i, id: pid, r: info(pid).reasoning ? r : '', nombre: info(pid).name,
-    t: new Tablero(JUEGO, k.V), t0: performance.now(), fin: null, costo: 0, llamadas: 0, estado: 'jugando', last: 'Arrancando…', nuevas: new Set() }));
-  P.forEach(p => p.t.revelar(...JUEGO.ini, 'inicio'));
+    t: new Tablero(JUEGO, k.V), t0: performance.now(),
+    reg: { seguras: 0, riesgos: 0, forzados: 0, minas: [], bandBien: 0, bandMal: 0, invalidas: 0, codigo: 0, jev: 0, errores: [], turnos: 0 }, fin: null, costo: 0, llamadas: 0, estado: 'jugando', last: 'Arrancando…', nuevas: new Set() }));
+  P.forEach(p => p.t.revelar(...JUEGO.ini, 'inicio')); PARTIDA = P;
   $('#paneles').innerHTML = P.map(p => `<div class="pn" id="pn${p.i}"></div>`).join('');
   P.forEach(pintarPanel); pintarRes(P);
   if (!matchMedia('(prefers-reduced-motion: reduce)').matches) await cuentaRegresiva();
@@ -485,12 +557,14 @@ async function correr(P, id) {
   while (id === corrida && t.vidas > 0 && !t.ganado() && turnos < tope && performance.now() - P.t0 < 15 * 60e3) {
     turnos++; let r;
     try { r = await jugador(t, P); errores = 0; }
-    catch (e) { P.last = '⚠ ' + e.message; pintarPanel(P); if (++errores >= 3) { P.estado = 'error'; break; } await sleep(1500); continue; }
+    catch (e) { P.last = '⚠ ' + e.message; P.reg.errores.push(e.message); pintarPanel(P); if (++errores >= 3) { P.estado = 'error'; break; } await sleep(1500); continue; }
     if (id !== corrida) return;
     let avance = false; P.nuevas = new Set();
     for (const [acc, f, c, quien] of r.jugadas.slice(0, 60)) {
-      if (!Number.isInteger(f) || !Number.isInteger(c)) continue;
+      if (!Number.isInteger(f) || !Number.isInteger(c)) { P.reg.invalidas++; continue; }
+      registrar(P, t, acc, f, c, quien);   // antes de jugar: ¿era una jugada demostrable o un riesgo?
       const res = acc === 'revelar' ? t.revelar(f, c, quien) : t.bandera(f, c);
+      if (res === 'invalida' && quien !== 'codigo') P.reg.invalidas++;   // el código puede repetir una celda que ya abrió la cascada
       if (res !== 'invalida') { avance = true; P.nuevas.add(f + ',' + c); }
       if (res === 'mina' || t.ganado()) break;
     }
@@ -539,6 +613,10 @@ $('#minasN').addEventListener('input', () => { const k = cfg();
   $('#minasHint').textContent = typeof k === 'string' ? k : `${Math.round(100 * k.M / (k.R * k.C))}% del tablero. Más minas = más veces hay que arriesgar.`; });
 $('#volver').onclick = () => { corrida++; $('#juego').style.display = 'none'; $('#setup').style.display = 'block'; document.body.classList.remove('playing'); $('#resModal').classList.remove('on'); };
 $('#verRes').onclick = () => $('#resModal').classList.add('on');
+$('#explicar').onclick = $('#explicar2').onclick = explicar;
+$('#cerrarExp').onclick = () => $('#expModal').classList.remove('on');
+$('#expModal').addEventListener('click', e => { if (e.target.id === 'expModal') $('#expModal').classList.remove('on'); });
+addEventListener('keydown', e => { if (e.key === 'Escape') $('#expModal').classList.remove('on'); });
 $('#cerrarRes').onclick = () => $('#resModal').classList.remove('on');
 $('#resModal').addEventListener('click', e => { if (e.target.id === 'resModal') $('#resModal').classList.remove('on'); });
 addEventListener('keydown', e => { if (e.key === 'Escape') $('#resModal').classList.remove('on'); });
