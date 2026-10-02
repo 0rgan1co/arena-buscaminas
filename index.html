@@ -559,7 +559,7 @@ async function empezar(mismo, sim = SIM) {
   $('#titJuego').textContent = `${SIM ? 'Simulación (sin IA real)' : 'Partida'} · ${JUEGO.R}×${JUEGO.C} · ${JUEGO.M} minas · semilla ${JUEGO.seed}`;
   const P = filas.filter(f => f[0]).map(([pid, r], i) => ({ i, id: pid, r: info(pid).reasoning ? r : '', nombre: info(pid).name,
     t: new Tablero(JUEGO, k.V), t0: performance.now(),
-    reg: { seguras: 0, riesgos: 0, forzados: 0, minas: [], bandBien: 0, bandMal: 0, invalidas: 0, codigo: 0, jev: 0, errores: [], turnos: 0 }, fin: null, costo: 0, llamadas: 0, estado: 'jugando', last: 'Arrancando…', nuevas: new Set() }));
+    reg: { seguras: 0, riesgos: 0, forzados: 0, minas: [], bandBien: 0, bandMal: 0, invalidas: 0, codigo: 0, jev: 0, errores: [], turnos: 0 }, fin: null, costo: 0, llamadas: 0, estado: 'jugando', last: 'Jugando…', nuevas: new Set() }));
   PARTIDA = P;
   P.forEach(p => p.last = 'Tablero tapado. Esperando la largada…');
   $('#paneles').innerHTML = P.map(p => `<div class="pn" id="pn${p.i}"></div>`).join('');
@@ -626,7 +626,7 @@ async function verGrabada() {
   const nP = G.partidas.length, cols = nP <= 5 ? nP : Math.ceil(nP / 2);
   $('#paneles').style.setProperty('--cols', cols); $('#paneles').style.setProperty('--filas', Math.ceil(nP / cols));
   const P = G.partidas.map((g, i) => ({ i, id: g.id, r: '', nombre: g.id.startsWith('typesafe/') ? 'TypeSafe AI / Jev (versión anterior)' : (info(g.id).name !== g.id ? info(g.id).name : g.nombre),
-    grab: g, t: new Tablero(JUEGO, G.vidas), t0: 0, fin: null, rec: 0, costo: 0, llamadas: 0, estado: 'jugando', last: 'Arrancando…', nuevas: new Set(),
+    grab: g, t: new Tablero(JUEGO, G.vidas), t0: 0, fin: null, rec: 0, costo: 0, llamadas: 0, estado: 'jugando', last: 'Jugando…', nuevas: new Set(),
     reg: { seguras: 0, riesgos: 0, forzados: 0, minas: [], bandBien: 0, bandMal: 0, invalidas: 0, codigo: 0, jev: 0, errores: [], turnos: 0 } }));
   PARTIDA = P;
   P.forEach(p => p.last = 'Tablero tapado. Esperando la largada…');
