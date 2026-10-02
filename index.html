@@ -249,8 +249,8 @@ const LOBE = { anthropic: 'anthropic', openai: 'openai', 'x-ai': 'xai', deepseek
   microsoft: 'microsoft', minimax: 'minimax', 'z-ai': 'zhipu', nousresearch: 'nousresearch' };
 function logoURL(id) {
   const p = id.split('/')[0];
-  if (p === 'typesafe') return 'https://www.google.com/s2/favicons?domain=typesafe.ai&sz=64';
-  return LOBE[p] ? `https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@latest/icons/${LOBE[p]}.svg` : null;
+  if (p === 'typesafe') return 'logos/typesafe.png';
+  return LOBE[p] ? `logos/${LOBE[p]}.svg` : null;   // copias locales de LobeHub Icons (MIT), carpeta logos/
 }
 function logoHTML(id, px = 30) {
   const [l, bg] = LOGO(id), u = logoURL(id), st = `width:${px}px;height:${px}px`;
