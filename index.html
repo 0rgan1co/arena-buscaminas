@@ -65,7 +65,21 @@ select.reason option{background:#111}
 .err{color:var(--bad);font-family:var(--mono);font-size:12px}
 /* juego */
 #juego{display:none}
-.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+/* modo juego: todo en una pantalla, sin scroll */
+body.playing header,body.playing footer{display:none}
+body.playing main.wrap{max-width:none;padding:0 14px}
+body.playing #juego{height:100vh;height:100dvh;display:flex;flex-direction:column;gap:10px;padding:10px 0;overflow:hidden}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;flex:none}
+.topbar .legend{margin:0}
+.topbar .btn{padding:7px 10px;font-size:11px}
+.grid{flex:1;min-height:0;display:grid;gap:10px;grid-template-columns:repeat(var(--cols,4),minmax(0,1fr));grid-template-rows:repeat(var(--filas,1),minmax(0,1fr))}
+.pn{min-height:0;overflow:hidden;padding:10px;gap:8px}
+.bd{flex:1 1 auto;min-height:0;max-width:100%;max-height:100%;margin:0 auto;height:auto;width:auto}
+.tabwrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;container-type:size}
+.tabwrap .bd{width:min(100cqw,100cqh * var(--arn));height:auto}
+#resModal{position:fixed;inset:0;background:rgba(8,8,10,.8);display:none;place-items:center;z-index:40;padding:16px}
+#resModal.on{display:grid}
+#resModal .caja{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:20px;width:min(900px,100%);max-height:90vh;overflow:auto}
 .pn{border:1px solid var(--line);border-radius:6px;background:var(--panel);padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0}
 .pn.win{border-color:var(--ok)}.pn.lose{border-color:#5a2a2a}
 .pn-h{display:flex;justify-content:space-between;align-items:center;gap:8px}
@@ -133,17 +147,19 @@ footer.wrap{padding:28px 16px 60px;color:var(--dim);font-size:12px;font-family:v
 </div>
 
 <div id="juego">
-  <section>
-    <div class="row-h"><div class="lbl"><i style="background:var(--jev)"></i><span id="titJuego">Partida</span></div>
-      <div class="go"><button class="btn" id="otra">Otra vez, mismo tablero</button><button class="btn" id="nuevo">Nuevo tablero</button><button class="btn" id="volver">Configurar</button></div></div>
-    <div class="legend"><span><i style="background:var(--cellr)"></i>revelada</span><span><i style="box-shadow:inset 0 0 0 2px var(--jev);background:var(--cellr)"></i>decisión de Jev</span><span><i style="background:var(--bad)"></i>mina pisada</span><span>⚑ bandera</span></div>
-    <div class="grid" id="paneles"></div>
-  </section>
-  <section>
-    <div class="lbl" style="margin-bottom:6px"><i style="background:var(--ok)"></i>Resultados</div>
-    <div class="scroll"><table class="res"><thead><tr><th>Modelo</th><th>Resultado</th><th>Celdas seguras</th><th>Vidas</th><th>Tiempo</th><th>Costo USD</th><th>Llamadas</th></tr></thead><tbody id="res"></tbody></table></div>
-    <p class="note" id="nota" style="margin-top:12px;line-height:1.6"></p>
-  </section>
+  <div class="topbar">
+    <div class="lbl"><i style="background:var(--jev)"></i><span id="titJuego">Partida</span></div>
+    <div class="legend"><span><i style="background:var(--cellr)"></i>revelada</span><span><i style="box-shadow:inset 0 0 0 2px var(--jev);background:var(--cellr)"></i>decisión de Jev</span><span><i style="background:var(--bad)"></i>mina</span><span>⚑ bandera</span></div>
+    <div class="go"><button class="btn" id="verRes">Resultados</button><button class="btn" id="otra">Otra vez</button><button class="btn" id="nuevo">Nuevo tablero</button><button class="btn" id="volver">Configurar</button></div>
+  </div>
+  <div class="grid" id="paneles"></div>
+  <div id="resModal" role="dialog" aria-modal="true" aria-labelledby="resTit">
+    <div class="caja">
+      <div class="row-h"><div class="lbl" id="resTit"><i style="background:var(--ok)"></i>Resultados</div><button class="btn" id="cerrarRes">Cerrar</button></div>
+      <div class="scroll"><table class="res"><thead><tr><th>Modelo</th><th>Resultado</th><th>Celdas seguras</th><th>Vidas</th><th>Tiempo</th><th>Costo USD</th><th>Llamadas</th></tr></thead><tbody id="res"></tbody></table></div>
+      <p class="note" id="nota" style="margin-top:12px;line-height:1.6"></p>
+    </div>
+  </div>
 </div>
 </main>
 <div id="cuentaReg" aria-live="assertive"></div>
@@ -446,7 +462,10 @@ async function empezar(mismo, sim = SIM) {
   if (!mismo || !JUEGO || JUEGO.R !== k.R || JUEGO.C !== k.C || JUEGO.M !== k.M)
     JUEGO = crearJuego(k.R, k.C, k.M, new URLSearchParams(location.search).get('semilla') || Math.random().toString(36).slice(2, 8));
   const id = ++corrida;
-  $('#setup').style.display = 'none'; $('#juego').style.display = 'block'; scrollTo(0, 0);
+  $('#setup').style.display = 'none'; $('#juego').style.display = 'flex'; document.body.classList.add('playing'); scrollTo(0, 0);
+  $('#resModal').classList.remove('on');
+  const nP = filas.filter(f => f[0]).length, cols = nP <= 5 ? nP : Math.ceil(nP / 2);   // hasta 5 en una fila; más, en dos
+  $('#paneles').style.setProperty('--cols', cols); $('#paneles').style.setProperty('--filas', Math.ceil(nP / cols));
   $('#titJuego').textContent = `${SIM ? 'Simulación (sin IA real)' : 'Partida'} · ${JUEGO.R}×${JUEGO.C} · ${JUEGO.M} minas · semilla ${JUEGO.seed}`;
   const P = filas.filter(f => f[0]).map(([pid, r], i) => ({ i, id: pid, r: info(pid).reasoning ? r : '', nombre: info(pid).name,
     t: new Tablero(JUEGO, k.V), t0: performance.now(), fin: null, costo: 0, llamadas: 0, estado: 'jugando', last: 'Arrancando…', nuevas: new Set() }));
@@ -457,7 +476,8 @@ async function empezar(mismo, sim = SIM) {
   if (id !== corrida) return;
   P.forEach(p => p.t0 = performance.now());   // el reloj arranca después del "¡Ya!"
   const reloj = setInterval(() => { if (id !== corrida) return clearInterval(reloj); P.forEach(pintarCab); pintarRes(P); }, 500);
-  Promise.all(P.map(p => correr(p, id))).then(() => { clearInterval(reloj); P.forEach(pintarCab); pintarRes(P, true); });
+  Promise.all(P.map(p => correr(p, id))).then(async () => { clearInterval(reloj); P.forEach(pintarCab); pintarRes(P, true);
+    await sleep(3500); if (id === corrida) $('#resModal').classList.add('on'); });   // resultados después del confeti
 }
 async function correr(P, id) {
   const jugador = P.id === CODE_ID ? jugarCodigoSolo : P.id === JEV_ID ? (SIM ? simJev : jugarJev) : (SIM ? simLLM : jugarLLM);
@@ -501,7 +521,7 @@ function pintarPanel(P) {
   }
   el.innerHTML = `<div class="pn-h"><b title="${esc(P.id)}">${esc(P.nombre)}${P.r ? ' · ' + { low: 'bajo', medium: 'medio', high: 'alto' }[P.r] : ''}</b>${tag}</div>
     <div class="stats"></div>
-    <div class="bd" style="grid-template-columns:repeat(${t.J.C},1fr);grid-template-rows:repeat(${t.J.R},1fr);--ar:${t.J.C}/${t.J.R}">${cells}</div>
+    <div class="tabwrap" style="--arn:${t.J.C / t.J.R}"><div class="bd" style="grid-template-columns:repeat(${t.J.C},1fr);grid-template-rows:repeat(${t.J.R},1fr);--ar:${t.J.C}/${t.J.R}">${cells}</div></div>
     <div class="last">${esc(P.last)} · ${P.llamadas} llamada(s)</div>`;
   pintarCab(P);
 }
@@ -517,7 +537,11 @@ $('#otra').onclick = () => empezar(true);
 $('#nuevo').onclick = () => empezar(false);
 $('#minasN').addEventListener('input', () => { const k = cfg();
   $('#minasHint').textContent = typeof k === 'string' ? k : `${Math.round(100 * k.M / (k.R * k.C))}% del tablero. Más minas = más veces hay que arriesgar.`; });
-$('#volver').onclick = () => { corrida++; $('#juego').style.display = 'none'; $('#setup').style.display = 'block'; };
+$('#volver').onclick = () => { corrida++; $('#juego').style.display = 'none'; $('#setup').style.display = 'block'; document.body.classList.remove('playing'); $('#resModal').classList.remove('on'); };
+$('#verRes').onclick = () => $('#resModal').classList.add('on');
+$('#cerrarRes').onclick = () => $('#resModal').classList.remove('on');
+$('#resModal').addEventListener('click', e => { if (e.target.id === 'resModal') $('#resModal').classList.remove('on'); });
+addEventListener('keydown', e => { if (e.key === 'Escape') $('#resModal').classList.remove('on'); });
 
 // ---------------- arranque ----------------
 (async () => { await volverDeOAuth(); await detectarAnfitrion(); pintarStatus(); pintarFilas(); cargarCatalogo(); })();
