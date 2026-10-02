@@ -28,6 +28,9 @@ section{padding:28px 0;border-bottom:1px solid var(--line)}
 .tr>div+div{border-left:1px solid var(--line)}
 .m{gap:14px;position:relative}
 .logo{width:30px;height:30px;border-radius:7px;display:grid;place-items:center;font-weight:600;font-size:13px;flex:none;background:#222;color:#fff}
+.logo.img{background:#f2f2f4;padding:15%}.logo.img img{width:100%;height:100%;object-fit:contain;display:block}
+.pn-h .who{display:flex;align-items:center;gap:8px;min-width:0}
+.res td .who,.exp h3 .who{display:inline-flex;align-items:center;gap:8px}
 .m select.pick{background:transparent;border:0;outline:0;width:100%;font-size:16px;padding:10px 0 14px;cursor:pointer;color:var(--txt);min-width:0}
 .m select.pick option,.m select.pick optgroup{background:#111;color:var(--txt)}
 .m small{position:absolute;left:60px;bottom:6px;font-family:var(--mono);font-size:10px;color:var(--dim)}
@@ -240,12 +243,26 @@ function opcionesModelo(sel) {
     html += `<optgroup label="${esc(p)}">${grupos[p].sort((a, b) => a.name.localeCompare(b.name)).map(opt).join('')}</optgroup>`;
   return html;
 }
+// Logos oficiales por proveedor: set abierto LobeHub Icons (MIT); TypeSafe con el ícono de su sitio.
+const LOBE = { anthropic: 'anthropic', openai: 'openai', 'x-ai': 'xai', deepseek: 'deepseek', google: 'gemini', 'meta-llama': 'meta',
+  mistralai: 'mistral', qwen: 'qwen', moonshotai: 'moonshot', cohere: 'cohere', perplexity: 'perplexity', nvidia: 'nvidia',
+  microsoft: 'microsoft', minimax: 'minimax', 'z-ai': 'zhipu', nousresearch: 'nousresearch' };
+function logoURL(id) {
+  const p = id.split('/')[0];
+  if (p === 'typesafe') return 'https://www.google.com/s2/favicons?domain=typesafe.ai&sz=64';
+  return LOBE[p] ? `https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@latest/icons/${LOBE[p]}.svg` : null;
+}
+function logoHTML(id, px = 30) {
+  const [l, bg] = LOGO(id), u = logoURL(id), st = `width:${px}px;height:${px}px`;
+  if (!u) return `<span class="logo" style="${st};background:${bg};font-size:${Math.round(px * .42)}px">${l}</span>`;
+  return `<span class="logo img" style="${st}"><img src="${u}" alt="" loading="lazy" onerror="this.parentNode.outerHTML='<span class=&quot;logo&quot; style=&quot;${st};background:${bg}&quot;>${l}</span>'"></span>`;
+}
 function pintarFilas() {
   $('#filas').innerHTML = filas.map(([id, r], i) => {
-    const m = info(id), [l, bg] = LOGO(id);
+    const m = info(id);
     const opts = m.reasoning ? [['', '—'], ['low', 'Bajo'], ['medium', 'Medio'], ['high', 'Alto']] : [['', '—']];
     return `<div class="tr" data-i="${i}">
-      <div class="m"><span class="logo" style="background:${bg}">${l}</span><select class="pick" data-k="id" aria-label="Modelo">${opcionesModelo(id)}</select><small>${esc(id)}</small></div>
+      <div class="m">${logoHTML(id)}<select class="pick" data-k="id" aria-label="Modelo">${opcionesModelo(id)}</select><small>${esc(id)}</small></div>
       <div class="price">${esc(m.price)}</div>
       <div><select class="reason" data-k="r" ${m.reasoning ? '' : 'disabled'} aria-label="Razonamiento">${opts.map(([v, t]) => `<option value="${v}" ${v === (m.reasoning ? r : '') ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
       <div><button class="x" data-k="x" aria-label="Quitar">×</button></div></div>`;
@@ -467,7 +484,7 @@ function explicar() {
   h += `</div>`;
   for (const p of P) {
     const g = p.reg, malas = g.minas.filter(m => m.nSeg > 0), forz = g.minas.filter(m => !m.nSeg);
-    h += `<h3>${nom(p)} <span class="tag ${p.estado === 'resuelto' ? 'ok' : p.estado === 'sin vidas' ? 'bad' : ''}">${esc(p.estado)}</span></h3><ul>`;
+    h += `<h3><span class="who">${logoHTML(p.id, 22)}${nom(p)}</span> <span class="tag ${p.estado === 'resuelto' ? 'ok' : p.estado === 'sin vidas' ? 'bad' : ''}">${esc(p.estado)}</span></h3><ul>`;
     h += `<li>Destapó ${p.t.seguras()} de ${tot} celdas en ${fmtT(segT(p))}, con un costo de $${fmt$(p.costo)} en ${p.llamadas} llamada(s).</li>`;
     h += `<li>De sus ${g.seguras + g.riesgos} jugadas de destapar, <b>${g.seguras} eran demostrablemente seguras</b> y ${g.riesgos} fueron riesgos${g.riesgos ? ` (${g.forzados} sin ninguna jugada segura disponible)` : ''}.</li>`;
     if (p.id === JEV_ID) h += `<li>Trabajo en equipo: el código hizo ${g.codigo} jugadas demostrables y <b>Jev decidió ${g.jev} vez/veces</b>, solo cuando había que arriesgar.</li>`;
@@ -593,7 +610,7 @@ function pintarPanel(P) {
     const v = t.e[f][c], k = f + ',' + c, n = v === 'r' ? t.num(f, c) : 0;
     cells += `<div class="c ${v === 'h' ? '' : v}${t.por[k] === 'jev' ? ' j' : ''}${P.nuevas.has(k) ? ' new' : ''}${n ? ' n' + n : ''}">${n || ''}</div>`;
   }
-  el.innerHTML = `<div class="pn-h"><b title="${esc(P.id)}">${esc(P.nombre)}${P.r ? ' · ' + { low: 'bajo', medium: 'medio', high: 'alto' }[P.r] : ''}</b>${tag}</div>
+  el.innerHTML = `<div class="pn-h"><span class="who">${logoHTML(P.id, 24)}<b title="${esc(P.id)}">${esc(P.nombre)}${P.r ? ' · ' + { low: 'bajo', medium: 'medio', high: 'alto' }[P.r] : ''}</b></span>${tag}</div>
     <div class="stats"></div>
     <div class="tabwrap" style="--arn:${t.J.C / t.J.R}"><div class="bd" style="grid-template-columns:repeat(${t.J.C},1fr);grid-template-rows:repeat(${t.J.R},1fr);--ar:${t.J.C}/${t.J.R}">${cells}</div></div>
     <div class="last">${esc(P.last)} · ${P.llamadas} llamada(s)</div>`;
@@ -602,7 +619,7 @@ function pintarPanel(P) {
 function pintarRes(P, final) {
   const orden = [...P].sort((a, b) => (b.estado === 'resuelto') - (a.estado === 'resuelto') || b.t.seguras() - a.t.seguras() || segT(a) - segT(b));
   const tot = JUEGO.R * JUEGO.C - JUEGO.M;
-  $('#res').innerHTML = orden.map(p => `<tr><td>${esc(p.nombre)}</td><td>${esc(p.estado)}</td><td>${p.t.seguras()} / ${tot}</td><td>${Math.max(p.t.vidas, 0)}</td><td>${fmtT(segT(p))}</td><td>$${fmt$(p.costo)}</td><td>${p.llamadas}</td></tr>`).join('');
+  $('#res').innerHTML = orden.map(p => `<tr><td><span class="who">${logoHTML(p.id, 20)}${esc(p.nombre)}</span></td><td>${esc(p.estado)}</td><td>${p.t.seguras()} / ${tot}</td><td>${Math.max(p.t.vidas, 0)}</td><td>${fmtT(segT(p))}</td><td>$${fmt$(p.costo)}</td><td>${p.llamadas}</td></tr>`).join('');
   $('#nota').textContent = SIM ? 'Simulación: jugadores falsos, sin IA real ni costo. Sirve para ver la pantalla y el tablero; no compara modelos.' : final ? 'Una partida es una muestra chica: los modelos (y Jev) varían entre corridas. Para comparar en serio, jugá varias veces el mismo tablero o varios tableros.' : 'Jugando… los resultados se completan al terminar.';
 }
 $('#jugar').onclick = () => empezar(false, false);

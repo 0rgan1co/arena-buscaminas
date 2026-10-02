@@ -1,0 +1,2 @@
+Logos de proveedores: LobeHub Icons (https://github.com/lobehub/lobe-icons), licencia MIT. Las marcas pertenecen a sus dueños y se usan solo para identificar cada modelo.
+TypeSafe: ícono del sitio typesafe.ai.
