@@ -146,7 +146,7 @@ footer.wrap{padding:28px 16px 60px;color:var(--dim);font-size:12px;font-family:v
   <section style="border-bottom:0">
     <div class="lbl" style="margin-bottom:16px"><i style="background:#7fd3ff"></i>03 / Que jueguen los modelos</div>
     <button class="big" id="jugar"><span>Iniciar comparación</span><span aria-hidden="true">↗</span></button>
-    <div class="go" style="margin-top:12px"><button class="btn" id="simular">▶ Simular sin gastar</button><span class="note">Prueba el tablero y la pantalla con jugadores simulados: no llama a ninguna IA ni usa saldo.</span></div>
+    <div class="go" style="margin-top:12px"><button class="btn" id="simular">▶ Simular sin gastar</button><a class="btn" href="partida-grabada.html" style="text-decoration:none;color:var(--txt)">Ver partida grabada</a><span class="note">Prueba el tablero y la pantalla con jugadores simulados: no llama a ninguna IA ni usa saldo.</span></div>
     <div class="err" id="err" style="margin-top:10px"></div>
     <p class="note" style="line-height:1.7;margin-top:22px">
       3 vidas por modelo. Todos arrancan desde la misma celda central, siempre segura. <b style="color:var(--jev)">Jev</b> juega en equipo con código: el código hace lo que se puede demostrar y Jev elige la celda de menor riesgo solo cuando hay que arriesgar (sus decisiones quedan en amarillo). Los otros modelos ven el tablero completo y deciden todo. <b style="color:var(--txt)">Solo código</b> es el control sin IA y es gratis. El tiempo incluye la conexión a OpenRouter. Costo reportado por la API. Una partida es una observación, no un ranking general.
@@ -158,7 +158,7 @@ footer.wrap{padding:28px 16px 60px;color:var(--dim);font-size:12px;font-family:v
   <div class="topbar">
     <div class="lbl"><i style="background:var(--jev)"></i><span id="titJuego">Partida</span></div>
     <div class="legend"><span><i style="background:var(--cellr)"></i>revelada</span><span><i style="box-shadow:inset 0 0 0 2px var(--jev);background:var(--cellr)"></i>decisión de Jev</span><span><i style="background:var(--bad)"></i>mina</span><span>⚑ bandera</span></div>
-    <div class="go"><button class="btn" id="explicar" style="border-color:var(--jev);color:var(--jev)">¿Por qué pasó?</button><button class="btn" id="verRes">Resultados</button><button class="btn" id="otra">Otra vez</button><button class="btn" id="nuevo">Nuevo tablero</button><button class="btn" id="volver">Configurar</button></div>
+    <div class="go"><button class="btn" id="vel" style="display:none">Velocidad ×1</button><button class="btn" id="explicar" style="border-color:var(--jev);color:var(--jev)">¿Por qué pasó?</button><button class="btn" id="verRes">Resultados</button><button class="btn" id="otra">Otra vez</button><button class="btn" id="nuevo">Nuevo tablero</button><button class="btn" id="volver">Configurar</button></div>
   </div>
   <div class="grid" id="paneles"></div>
   <div id="expModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="expTit">
@@ -473,7 +473,8 @@ function explicar() {
   const J = JUEGO, L = soloLogica(J), tot = L.tot;
   const fin = P.every(p => p.estado !== 'jugando'), ganadores = P.filter(p => p.estado === 'resuelto');
   const nom = p => esc(p.nombre);
-  let h = SIM ? `<p class="clave"><b>Esto fue una simulación:</b> los jugadores son falsos. Sirve para ver cómo se lee la explicación, no para sacar conclusiones sobre los modelos.</p>` : '';
+  let h = MODO_GRABADA ? `<p class="clave"><b>Partida grabada (30/09/2026).</b> Se reproduce con las jugadas y tiempos reales de ese día.</p>` : '';
+  h += SIM ? `<p class="clave"><b>Esto fue una simulación:</b> los jugadores son falsos. Sirve para ver cómo se lee la explicación, no para sacar conclusiones sobre los modelos.</p>` : '';
   h += `<h3>El tablero</h3><p>${J.R}×${J.C} con ${J.M} minas (${Math.round(100 * J.M / (J.R * J.C))}% de las celdas). `;
   h += L.gana ? `<b>Se podía ganar sin arriesgar nunca:</b> usando solo lógica (las dos reglas del código) se resuelve completo. Cualquier mina pisada acá fue un error evitable.</p>`
               : `<b>No se podía ganar solo con lógica:</b> con las dos reglas del código se llega a ${L.celdas} de ${tot} celdas y después hay que arriesgar sí o sí. En esos momentos entra el criterio (o la suerte).</p>`;
@@ -487,6 +488,7 @@ function explicar() {
     h += `<h3><span class="who">${logoHTML(p.id, 22)}${nom(p)}</span> <span class="tag ${p.estado === 'resuelto' ? 'ok' : p.estado === 'sin vidas' ? 'bad' : ''}">${esc(p.estado)}</span></h3><ul>`;
     h += `<li>Destapó ${p.t.seguras()} de ${tot} celdas en ${fmtT(segT(p))}, con un costo de $${fmt$(p.costo)} en ${p.llamadas} llamada(s).</li>`;
     h += `<li>De sus ${g.seguras + g.riesgos} jugadas de destapar, <b>${g.seguras} eran demostrablemente seguras</b> y ${g.riesgos} fueron riesgos${g.riesgos ? ` (${g.forzados} sin ninguna jugada segura disponible)` : ''}.</li>`;
+    if (p.id !== JEV_ID && p.id.startsWith('typesafe/')) h += `<li>En esta partida grabada Jev jugaba con la <b>versión anterior</b>: decidía todas las jugadas solo, sin que el código hiciera las demostrables. Hoy juega en equipo con el código.</li>`;
     if (p.id === JEV_ID) h += `<li>Trabajo en equipo: el código hizo ${g.codigo} jugadas demostrables y <b>Jev decidió ${g.jev} vez/veces</b>, solo cuando había que arriesgar.</li>`;
     if (malas.length) h += `<li><b>Error evitable:</b> pisó ${malas.length} mina(s) habiendo jugadas seguras disponibles (${malas.map(m => `(${m.f},${m.c}) con ${m.nSeg} seguras a mano`).join('; ')}). No fue mala suerte: fue un error de razonamiento.</li>`;
     if (forz.length) h += `<li>Pisó ${forz.length} mina(s) en momentos sin ninguna jugada segura (${forz.map(m => `(${m.f},${m.c})`).join(', ')}): ahí había que arriesgar y salió mal.</li>`;
@@ -541,7 +543,7 @@ function confeti(panel) {   // confeti sobre el tablero del modelo que resolvió
   })(t0);
 }
 async function empezar(mismo, sim = SIM) {
-  SIM = sim;
+  SIM = sim; MODO_GRABADA = false; $('#vel').style.display = 'none';
   const k = cfg(); if (typeof k === 'string') { $('#err').textContent = k; return; }
   const ids = filas.map(f => f[0]).filter(Boolean);
   if (!ids.length) { $('#err').textContent = 'Agregá al menos un modelo.'; return; }
@@ -595,7 +597,53 @@ async function correr(P, id) {
   pintarPanel(P);
   if (P.estado === 'resuelto' && id === corrida && !matchMedia('(prefers-reduced-motion: reduce)').matches) confeti($('#pn' + P.i));
 }
-const segT = P => (P.fin ?? (performance.now() - P.t0) / 1000);
+const segT = P => P.rec != null ? P.rec : (P.fin ?? (performance.now() - P.t0) / 1000);
+
+// ---------------- repetición de una partida grabada (misma interfaz) ----------------
+let VEL = 1, GRABADA = null;
+async function verGrabada() {
+  try { GRABADA = GRABADA || await (await fetch('partida-grabada.json')).json(); }
+  catch (e) { $('#err').textContent = 'No pude cargar la partida grabada.'; return; }
+  const G = GRABADA, id = ++corrida; SIM = false;
+  JUEGO = { R: G.n, C: G.n, M: G.minas.length, seed: 'grabada', ini: G.inicio, minas: new Set(G.minas.map(([f, c]) => f + ',' + c)) };
+  $('#setup').style.display = 'none'; $('#juego').style.display = 'flex'; document.body.classList.add('playing'); scrollTo(0, 0);
+  $('#resModal').classList.remove('on'); $('#expModal').classList.remove('on');
+  $('#titJuego').textContent = `Partida grabada · ${G.fecha.split('-').reverse().join('/')} · ${G.n}×${G.n} · ${G.minas.length} minas`;
+  $('#vel').style.display = ''; $('#vel').textContent = `Velocidad ×${VEL}`;
+  const nP = G.partidas.length, cols = nP <= 5 ? nP : Math.ceil(nP / 2);
+  $('#paneles').style.setProperty('--cols', cols); $('#paneles').style.setProperty('--filas', Math.ceil(nP / cols));
+  const P = G.partidas.map((g, i) => ({ i, id: g.id, r: '', nombre: g.id.startsWith('typesafe/') ? 'TypeSafe AI / Jev (versión anterior)' : (info(g.id).name !== g.id ? info(g.id).name : g.nombre),
+    grab: g, t: new Tablero(JUEGO, G.vidas), t0: 0, fin: null, rec: 0, costo: 0, llamadas: 0, estado: 'jugando', last: 'Arrancando…', nuevas: new Set(),
+    reg: { seguras: 0, riesgos: 0, forzados: 0, minas: [], bandBien: 0, bandMal: 0, invalidas: 0, codigo: 0, jev: 0, errores: [], turnos: 0 } }));
+  P.forEach(p => p.t.revelar(...JUEGO.ini, 'inicio')); PARTIDA = P;
+  $('#paneles').innerHTML = P.map(p => `<div class="pn" id="pn${p.i}"></div>`).join('');
+  P.forEach(pintarPanel); pintarRes(P);
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) await cuentaRegresiva();
+  if (id !== corrida) return;
+  const reloj = setInterval(() => { if (id !== corrida) return clearInterval(reloj); P.forEach(pintarCab); pintarRes(P); }, 500);
+  await Promise.all(P.map(async p => {
+    const esJev = p.id.startsWith('typesafe/');
+    let prev = 0;
+    for (const tu of p.grab.turnos) {
+      await sleep(Math.max(0, (tu.t1 - prev) * 1000 / VEL)); prev = tu.t1; if (id !== corrida) return;
+      p.nuevas = new Set(); p.llamadas++; p.costo += tu.costo || 0; p.rec = tu.t1;
+      for (const j of tu.jugadas) {
+        if (j.r === 'invalida' || !Number.isInteger(j.f)) { p.reg.invalidas++; continue; }
+        const quien = esJev ? 'jev_v0' : 'llm';
+        registrar(p, p.t, j.a, j.f, j.c, quien);
+        j.a === 'revelar' ? p.t.revelar(j.f, j.c, quien) : p.t.bandera(j.f, j.c); p.nuevas.add(j.f + ',' + j.c);
+      }
+      p.last = `${tu.jugadas.length} jugada(s): ` + tu.jugadas.slice(0, 6).map(j => `${j.a[0]}(${j.f},${j.c})`).join(' ');
+      pintarPanel(p);
+    }
+    p.rec = p.grab.tiempo; p.fin = p.grab.tiempo;
+    p.estado = p.t.ganado() ? 'resuelto' : p.t.vidas <= 0 ? 'sin vidas' : 'incompleto';
+    pintarPanel(p);
+    if (p.estado === 'resuelto' && id === corrida && !matchMedia('(prefers-reduced-motion: reduce)').matches) confeti($('#pn' + p.i));
+  }));
+  clearInterval(reloj); P.forEach(pintarCab); pintarRes(P, true);
+  await sleep(3500); if (id === corrida) $('#resModal').classList.add('on');
+}
 function pintarCab(P) {
   const el = $('#pn' + P.i); if (!el) return;
   const tot = P.t.J.R * P.t.J.C - P.t.J.M;
@@ -620,15 +668,20 @@ function pintarRes(P, final) {
   const orden = [...P].sort((a, b) => (b.estado === 'resuelto') - (a.estado === 'resuelto') || b.t.seguras() - a.t.seguras() || segT(a) - segT(b));
   const tot = JUEGO.R * JUEGO.C - JUEGO.M;
   $('#res').innerHTML = orden.map(p => `<tr><td><span class="who">${logoHTML(p.id, 20)}${esc(p.nombre)}</span></td><td>${esc(p.estado)}</td><td>${p.t.seguras()} / ${tot}</td><td>${Math.max(p.t.vidas, 0)}</td><td>${fmtT(segT(p))}</td><td>$${fmt$(p.costo)}</td><td>${p.llamadas}</td></tr>`).join('');
-  $('#nota').textContent = SIM ? 'Simulación: jugadores falsos, sin IA real ni costo. Sirve para ver la pantalla y el tablero; no compara modelos.' : final ? 'Una partida es una muestra chica: los modelos (y Jev) varían entre corridas. Para comparar en serio, jugá varias veces el mismo tablero o varios tableros.' : 'Jugando… los resultados se completan al terminar.';
+  $('#nota').textContent = MODO_GRABADA ? 'Partida grabada el 30/09/2026 y reproducida con sus tiempos reales (o acelerada). En esa versión Jev jugaba solo: decidía todas las jugadas sin ayuda del código. Hoy Jev juega en equipo con el código.' : SIM ? 'Simulación: jugadores falsos, sin IA real ni costo. Sirve para ver la pantalla y el tablero; no compara modelos.' : final ? 'Una partida es una muestra chica: los modelos (y Jev) varían entre corridas. Para comparar en serio, jugá varias veces el mismo tablero o varios tableros.' : 'Jugando… los resultados se completan al terminar.';
 }
 $('#jugar').onclick = () => empezar(false, false);
 $('#simular').onclick = () => empezar(false, true);
-$('#otra').onclick = () => empezar(true);
-$('#nuevo').onclick = () => empezar(false);
+$('#otra').onclick = () => MODO_GRABADA ? verGrabada() : empezar(true);
+$('#nuevo').onclick = () => { if (MODO_GRABADA) { salirGrabada(); return; } empezar(false); };
+$('#vel').onclick = () => { VEL = { 1: 4, 4: 16, 16: 1 }[VEL]; $('#vel').textContent = `Velocidad ×${VEL}`; };
+let MODO_GRABADA = false;
+function salirGrabada() { MODO_GRABADA = false; $('#vel').style.display = 'none'; history.replaceState(null, '', location.pathname); $('#volver').click(); }
+document.querySelectorAll('a[href="partida-grabada.html"]').forEach(a => a.onclick = e => { e.preventDefault(); MODO_GRABADA = true; history.replaceState(null, '', '?grabada'); verGrabada(); });
 $('#minasN').addEventListener('input', () => { const k = cfg();
   $('#minasHint').textContent = typeof k === 'string' ? k : `${Math.round(100 * k.M / (k.R * k.C))}% del tablero. Más minas = más veces hay que arriesgar.`; });
-$('#volver').onclick = () => { corrida++; $('#juego').style.display = 'none'; $('#setup').style.display = 'block'; document.body.classList.remove('playing'); $('#resModal').classList.remove('on'); };
+$('#volver').onclick = () => { corrida++; MODO_GRABADA = false; $('#vel').style.display = 'none';
+  if (location.search.includes('grabada')) history.replaceState(null, '', location.pathname); $('#juego').style.display = 'none'; $('#setup').style.display = 'block'; document.body.classList.remove('playing'); $('#resModal').classList.remove('on'); };
 $('#verRes').onclick = () => $('#resModal').classList.add('on');
 $('#explicar').onclick = $('#explicar2').onclick = explicar;
 $('#cerrarExp').onclick = () => $('#expModal').classList.remove('on');
@@ -639,7 +692,8 @@ $('#resModal').addEventListener('click', e => { if (e.target.id === 'resModal') 
 addEventListener('keydown', e => { if (e.key === 'Escape') $('#resModal').classList.remove('on'); });
 
 // ---------------- arranque ----------------
-(async () => { await volverDeOAuth(); await detectarAnfitrion(); pintarStatus(); pintarFilas(); cargarCatalogo(); })();
+(async () => { await volverDeOAuth(); await detectarAnfitrion(); pintarStatus(); pintarFilas(); await cargarCatalogo();
+  if (new URLSearchParams(location.search).has('grabada')) { MODO_GRABADA = true; verGrabada(); } })();
 </script>
 </body>
 </html>
