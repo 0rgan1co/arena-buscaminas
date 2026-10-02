@@ -464,9 +464,9 @@ async function simLLM(t, P) {
 // Antes de cada jugada el código mira si había una jugada demostrable (con sus dos reglas).
 function registrar(P, t, acc, f, c, quien) {
   const g = P.reg;
+  if (t.e[f]?.[c] !== 'h') return;   // celda ya abierta (p. ej. por una cascada): no es una decisión
   if (quien === 'codigo') g.codigo++; if (quien === 'jev') g.jev++;
-  if (acc === 'bandera') { if (t.e[f]?.[c] === 'h') t.mina(f, c) ? g.bandBien++ : g.bandMal++; return; }
-  if (t.e[f]?.[c] !== 'h') return;
+  if (acc === 'bandera') { t.mina(f, c) ? g.bandBien++ : g.bandMal++; return; }
   const d = deducir(t, true), segura = quien === 'codigo' || d.seg.some(([x, y]) => x === f && y === c), trabado = !d.seg.length && !d.min.length;
   if (segura) g.seguras++; else { g.riesgos++; if (trabado) g.forzados++; }
   if (t.mina(f, c)) g.minas.push({ f, c, nSeg: d.seg.length, quien });
@@ -499,7 +499,9 @@ function explicar() {
     h += `<li>Destapó ${p.t.seguras()} de ${tot} celdas en ${fmtT(segT(p))}, con un costo de $${fmt$(p.costo)} en ${p.llamadas} llamada(s).</li>`;
     h += `<li>De sus ${g.seguras + g.riesgos} jugadas de destapar, <b>${g.seguras} eran demostrablemente seguras</b> y ${g.riesgos} fueron riesgos${g.riesgos ? ` (${g.forzados} sin ninguna jugada segura disponible)` : ''}.</li>`;
     if (p.id !== JEV_ID && p.id.startsWith('typesafe/')) h += `<li>En esta partida grabada Jev jugaba con la <b>versión anterior</b>: decidía todas las jugadas solo, sin que el código hiciera las demostrables. Hoy juega en equipo con el código.</li>`;
-    if (p.id === JEV_ID) h += `<li>Trabajo en equipo: el código hizo ${g.codigo} jugadas demostrables y <b>Jev decidió ${g.jev} vez/veces</b>, solo cuando había que arriesgar.</li>`;
+    if (p.id === JEV_ID) h += g.jev
+      ? `<li>Trabajo en equipo: el código hizo ${g.codigo} jugadas demostrables y <b>Jev decidió ${g.jev} vez/veces</b>, solo cuando había que arriesgar.</li>`
+      : `<li><b>Jev no fue consultado:</b> el código resolvió todo con lógica y nunca hubo que arriesgar. En este tablero Jev no fue puesto a prueba; para verlo decidir, subí la cantidad de minas (22% o más del tablero suele obligar a arriesgar).</li>`;
     if (malas.length) h += `<li><b>Error evitable:</b> pisó ${malas.length} mina(s) habiendo jugadas seguras disponibles (${malas.map(m => `(${m.f},${m.c}) con ${m.nSeg} seguras a mano`).join('; ')}). No fue mala suerte: fue un error de razonamiento.</li>`;
     if (forz.length) h += `<li>Pisó ${forz.length} mina(s) en momentos sin ninguna jugada segura (${forz.map(m => `(${m.f},${m.c})`).join(', ')}): ahí había que arriesgar y salió mal.</li>`;
     if (g.bandMal) h += `<li>Puso ${g.bandMal} bandera(s) en celdas sin mina: eso confunde sus propias cuentas de las jugadas siguientes.</li>`;
@@ -697,7 +699,9 @@ function pintarRes(P, final) {
     const g = p.reg, band = g.bandBien + g.bandMal, dec = g.seguras + g.riesgos + band;
     const evit = g.minas.filter(m => m.nSeg > 0).length, bien = dec - g.minas.length - g.bandMal;
     const acierto = dec ? Math.round(100 * bien / dec) + '%' : '—';
-    const quien = p.id === JEV_ID && dec ? `<div class="k">código ${g.codigo} · Jev ${g.jev}</div>` : '';
+    const quien = p.id !== JEV_ID || !dec ? ''
+      : g.jev ? `<div class="k">código ${g.codigo} · Jev ${g.jev}</div>`
+      : `<div class="k" title="El código resolvió todo con lógica: nunca hubo que arriesgar, así que no se le preguntó nada a Jev.">todo con lógica · Jev no fue consultado</div>`;
     return `<tr><td><span class="who">${logoHTML(p.id, 20)}${esc(p.nombre)}</span></td><td>${esc(p.estado)}</td>
       <td>${p.t.seguras()} / ${tot}</td><td>${Math.max(p.t.vidas, 0)}</td>
       <td><b>${dec}</b>${quien}</td>
@@ -718,7 +722,9 @@ let MODO_GRABADA = false;
 function salirGrabada() { MODO_GRABADA = false; $('#vel').style.display = 'none'; history.replaceState(null, '', location.pathname); $('#volver').click(); }
 document.querySelectorAll('a[href="partida-grabada.html"]').forEach(a => a.onclick = e => { e.preventDefault(); MODO_GRABADA = true; history.replaceState(null, '', '?grabada'); verGrabada(); });
 $('#minasN').addEventListener('input', () => { const k = cfg();
-  $('#minasHint').textContent = typeof k === 'string' ? k : `${Math.round(100 * k.M / (k.R * k.C))}% del tablero. Más minas = más veces hay que arriesgar.`; });
+  $('#minasHint').textContent = typeof k === 'string' ? k : `${Math.round(100 * k.M / (k.R * k.C))}% del tablero. ` + (k.M / (k.R * k.C) < 0.2
+    ? 'Con tan pocas minas el código suele resolver todo con lógica y Jev casi no decide.'
+    : 'Con esta densidad suele haber que arriesgar: ahí decide Jev.'); });
 $('#volver').onclick = () => { corrida++; MODO_GRABADA = false; $('#vel').style.display = 'none';
   if (location.search.includes('grabada')) history.replaceState(null, '', location.pathname); $('#juego').style.display = 'none'; $('#setup').style.display = 'block'; document.body.classList.remove('playing'); $('#resModal').classList.remove('on'); };
 $('#verRes').onclick = () => $('#resModal').classList.add('on');
