@@ -87,6 +87,10 @@ body.playing #juego{height:100vh;height:100dvh;display:flex;flex-direction:colum
 .exp p{margin:6px 0}.exp ul{margin:6px 0;padding-left:20px}.exp li{margin:3px 0}
 .exp .k{font-family:var(--mono);font-size:12px;color:var(--mut)}
 .exp .clave{border-left:3px solid var(--jev);padding:8px 12px;background:#17171b;border-radius:0 4px 4px 0;margin:10px 0}
+table.res td{white-space:nowrap}table.res td:first-child{white-space:normal}
+table.res td .k{font-family:var(--mono);font-size:11px;color:var(--mut)}
+table.res th[title]{text-decoration:underline dotted;cursor:help}
+#resModal .caja{width:min(1240px,100%)!important}
 #resModal .caja,#expModal .caja{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:20px;width:min(900px,100%);max-height:90vh;overflow:auto}
 .pn{border:1px solid var(--line);border-radius:6px;background:var(--panel);padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0}
 .pn.win{border-color:var(--ok)}.pn.lose{border-color:#5a2a2a}
@@ -170,8 +174,14 @@ footer.wrap{padding:28px 16px 60px;color:var(--dim);font-size:12px;font-family:v
   <div id="resModal" role="dialog" aria-modal="true" aria-labelledby="resTit">
     <div class="caja">
       <div class="row-h"><div class="lbl" id="resTit"><i style="background:var(--ok)"></i>Resultados</div><div class="go"><button class="btn" id="explicar2" style="border-color:var(--jev);color:var(--jev)">¿Por qué pasó?</button><button class="btn" id="cerrarRes">Cerrar</button></div></div>
-      <div class="scroll"><table class="res"><thead><tr><th>Modelo</th><th>Resultado</th><th>Celdas seguras</th><th>Vidas</th><th>Tiempo</th><th>Costo USD</th><th>Llamadas</th></tr></thead><tbody id="res"></tbody></table></div>
-      <p class="note" id="nota" style="margin-top:12px;line-height:1.6"></p>
+      <div class="scroll"><table class="res"><thead><tr><th>Modelo</th><th>Resultado</th><th>Celdas</th><th>Vidas</th>
+        <th title="Cada celda que destapó o marcó con bandera">Decisiones</th>
+        <th title="Seguras: demostrables con lógica. Riesgos: no demostrables (entre paréntesis, los obligados: no había ninguna jugada segura)">Seguras / Riesgos</th>
+        <th title="Minas pisadas habiendo jugadas seguras disponibles">Errores evitables</th>
+        <th title="Porcentaje de decisiones correctas: sin pisar mina y sin bandera mal puesta">Acierto</th>
+        <th>Tiempo</th><th title="Tiempo total dividido por decisiones">Seg / decisión</th><th>Costo USD</th><th title="Costo total dividido por decisiones">USD / decisión</th></tr></thead><tbody id="res"></tbody></table></div>
+      <p class="note" style="margin-top:12px;line-height:1.6"><b style="color:var(--txt)">Cómo leerla:</b> <b>Decisiones</b> = celdas que destapó o marcó. <b>Seguras</b> = demostrables con lógica; <b>riesgos</b> = no demostrables (los "oblig." fueron sin ninguna jugada segura disponible). <b>Errores evitables</b> = minas pisadas teniendo jugadas seguras a mano. <b>Acierto</b> = decisiones sin pisar mina ni marcar mal. Pasá el mouse por cada título para ver la definición.</p>
+      <p class="note" id="nota" style="margin-top:8px;line-height:1.6"></p>
     </div>
   </div>
 </div>
@@ -683,7 +693,20 @@ function pintarPanel(P) {
 function pintarRes(P, final) {
   const orden = [...P].sort((a, b) => (b.estado === 'resuelto') - (a.estado === 'resuelto') || b.t.seguras() - a.t.seguras() || segT(a) - segT(b));
   const tot = JUEGO.R * JUEGO.C - JUEGO.M;
-  $('#res').innerHTML = orden.map(p => `<tr><td><span class="who">${logoHTML(p.id, 20)}${esc(p.nombre)}</span></td><td>${esc(p.estado)}</td><td>${p.t.seguras()} / ${tot}</td><td>${Math.max(p.t.vidas, 0)}</td><td>${fmtT(segT(p))}</td><td>$${fmt$(p.costo)}</td><td>${p.llamadas}</td></tr>`).join('');
+  $('#res').innerHTML = orden.map(p => {
+    const g = p.reg, band = g.bandBien + g.bandMal, dec = g.seguras + g.riesgos + band;
+    const evit = g.minas.filter(m => m.nSeg > 0).length, bien = dec - g.minas.length - g.bandMal;
+    const acierto = dec ? Math.round(100 * bien / dec) + '%' : '—';
+    const quien = p.id === JEV_ID && dec ? `<div class="k">código ${g.codigo} · Jev ${g.jev}</div>` : '';
+    return `<tr><td><span class="who">${logoHTML(p.id, 20)}${esc(p.nombre)}</span></td><td>${esc(p.estado)}</td>
+      <td>${p.t.seguras()} / ${tot}</td><td>${Math.max(p.t.vidas, 0)}</td>
+      <td><b>${dec}</b>${quien}</td>
+      <td>${g.seguras} / ${g.riesgos}${g.forzados ? ` <span class="k">(${g.forzados} oblig.)</span>` : ''}</td>
+      <td style="color:${evit ? 'var(--bad)' : 'inherit'}">${evit}</td>
+      <td>${acierto}</td>
+      <td>${fmtT(segT(p))}</td><td>${dec ? (segT(p) / dec).toFixed(2) : '—'}</td>
+      <td>$${fmt$(p.costo)}</td><td>${dec && p.costo ? '$' + fmt$(p.costo / dec) : dec ? '$0' : '—'}</td></tr>`;
+  }).join('');
   $('#nota').textContent = MODO_GRABADA ? 'Partida grabada el 30/09/2026 y reproducida con sus tiempos reales (o acelerada). En esa versión Jev jugaba solo: decidía todas las jugadas sin ayuda del código. Hoy Jev juega en equipo con el código.' : SIM ? 'Simulación: jugadores falsos, sin IA real ni costo. Sirve para ver la pantalla y el tablero; no compara modelos.' : final ? 'Una partida es una muestra chica: los modelos (y Jev) varían entre corridas. Para comparar en serio, jugá varias veces el mismo tablero o varios tableros.' : 'Jugando… los resultados se completan al terminar.';
 }
 $('#jugar').onclick = () => empezar(false, false);
