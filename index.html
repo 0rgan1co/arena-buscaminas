@@ -86,6 +86,7 @@ body.playing #juego{height:100vh;height:100dvh;display:flex;flex-direction:colum
 .exp h3{font-size:15px;margin:18px 0 6px;color:var(--txt);display:flex;gap:8px;align-items:center}
 .exp p{margin:6px 0}.exp ul{margin:6px 0;padding-left:20px}.exp li{margin:3px 0}
 .exp .k{font-family:var(--mono);font-size:12px;color:var(--mut)}
+.exp a{color:var(--jev)}
 .exp .clave{border-left:3px solid var(--jev);padding:8px 12px;background:#17171b;border-radius:0 4px 4px 0;margin:10px 0}
 table.res td{white-space:nowrap}table.res td:first-child{white-space:normal}
 table.res td .k{font-family:var(--mono);font-size:11px;color:var(--mut)}
@@ -153,7 +154,7 @@ footer.wrap{padding:28px 16px 60px;color:var(--dim);font-size:12px;font-family:v
     <div class="go" style="margin-top:12px"><button class="btn" id="simular">▶ Simular sin gastar</button><a class="btn" href="partida-grabada.html" style="text-decoration:none;color:var(--txt)">Ver partida grabada</a><span class="note">Prueba el tablero y la pantalla con jugadores simulados: no llama a ninguna IA ni usa saldo.</span></div>
     <div class="err" id="err" style="margin-top:10px"></div>
     <p class="note" style="line-height:1.7;margin-top:22px">
-      3 vidas por modelo. Todos arrancan desde la misma celda central, siempre segura. <b style="color:var(--jev)">Jev</b> juega en equipo con código: el código hace lo que se puede demostrar y Jev elige la celda de menor riesgo solo cuando hay que arriesgar (sus decisiones quedan en amarillo). Los otros modelos ven el tablero completo y deciden todo. <b style="color:var(--txt)">Solo código</b> es el control sin IA y es gratis. El tiempo incluye la conexión a OpenRouter. Costo reportado por la API. Una partida es una observación, no un ranking general.
+      3 vidas por modelo. Todos arrancan desde la misma celda central, siempre segura. <b style="color:var(--jev)">Jev toma todas sus decisiones</b>: en cada turno el código le arma las jugadas posibles con sus datos (qué está demostrado como seguro o como mina) y Jev elige una. Sus decisiones quedan marcadas en amarillo. <a href="https://typesafe.ai/blog/introducing-system-one-models-and-jev" target="_blank" rel="noopener">¿Qué es Jev?</a> Los otros modelos ven el tablero completo y deciden todo. <b style="color:var(--txt)">Solo código</b> es el control sin IA y es gratis. El tiempo incluye la conexión a OpenRouter. Costo reportado por la API. Una partida es una observación, no un ranking general.
     </p>
   </section>
 </div>
@@ -407,25 +408,38 @@ async function jugarCodigoSolo(t, P) {
   const p = ocultas[Math.floor(Math.random() * ocultas.length)];
   return { jugadas: [['revelar', ...p, 'azar']], txt: `Trabado: arriesga al azar en (${p})` };
 }
-async function jugarJev(t, P) {
-  const r = turnoCodigo(t); if (r) return r;
-  // Trabado: Jev elige la celda candidata de menor riesgo (primitivo choice, una sola pregunta)
+// Patrón "el código calcula, Jev decide" (como el agente de Minecraft con Jev):
+// el código arma las jugadas posibles con hechos medidos y Jev elige UNA por turno (primitivo choice).
+function opcionesJev(t) {
   const R = t.restricciones(), hechos = {};
   for (const x of R) for (const p of x.o) (hechos[p] ||= []).push({ numero: x.numero, minas_faltantes: x.falt, vecinas_ocultas: x.o.length });
-  let cand = Object.keys(hechos).sort((a, b) => hechos[b].length - hechos[a].length).slice(0, 12);
+  const d = deducir(t, true), seg = new Set(d.seg.map(String)), min = new Set(d.min.map(String));
   const ocultas = []; t.e.forEach((fila, f) => fila.forEach((v, c) => v === 'h' && ocultas.push(f + ',' + c)));
-  const interior = ocultas.find(k => !hechos[k]); if (interior) cand.push(interior);
+  const interior = ocultas.find(k => !hechos[k] && !seg.has(k) && !min.has(k));
+  const ops = [];
+  const add = (acc, k, prueba) => ops.push({ acc, k, crit: { accion: acc === 'revelar' ? 'destapar' : 'poner bandera', celda: k.split(',').map(Number),
+    lo_que_demostro_el_codigo: prueba, restricciones_vecinas: hechos[k] || 'ninguna: no toca ningún número revelado' } });
+  [...seg].slice(0, 6).forEach(k => add('revelar', k, 'segura: demostrado que NO es mina'));
+  [...min].slice(0, 4).forEach(k => add('bandera', k, 'mina: demostrado que ES mina'));
+  Object.keys(hechos).filter(k => !seg.has(k) && !min.has(k)).sort((a, b) => hechos[b].length - hechos[a].length).slice(0, 8)
+    .forEach(k => add('revelar', k, 'sin demostración: puede ser mina'));
+  if (interior) add('revelar', interior, 'sin demostración: lejos de los números, riesgo igual a la densidad global');
+  return { ops, ocultas, hayDemostradas: seg.size + min.size > 0 };
+}
+async function jugarJev(t, P) {
+  const { ops, ocultas } = opcionesJev(t);
   const marcadas = t.e.flat().filter(v => v === 'f' || v === 'x').length;
-  const crit = {}; cand.forEach((k, i) => { crit['c' + i] = { celda: k.split(',').map(Number),
-    restricciones_vecinas: hechos[k] || 'ninguna: no toca ningún número revelado' }; });
-  const st = { reglas: REGLAS(t.J), minas_sin_marcar: t.J.M - marcadas, celdas_ocultas: ocultas.length,
+  const crit = {}; ops.forEach((o, i) => crit['o' + i] = o.crit);
+  const st = { reglas: REGLAS(t.J), vidas: t.vidas, minas_sin_marcar: t.J.M - marcadas, celdas_ocultas: ocultas.length,
     densidad_de_minas_en_ocultas: +((t.J.M - marcadas) / ocultas.length).toFixed(3) };
-  const j = await post('/api/alpha/decisions', { model: JEV_ID, state: JSON.stringify(st), questions: { celda: { type: 'choice',
-    instructions: 'No hay ninguna jugada segura demostrable. Elegí la celda oculta con MENOR probabilidad de ser mina. Cada restricción vecina es un número revelado: minas_faltantes es cuántas minas quedan entre sus vecinas_ocultas. Una celda sin restricciones tiene la densidad global de minas.', criteria: crit } } });
-  const a = j.answers?.celda, k = a?.choice; if (!crit[k]) throw new Error('Jev devolvió una opción inválida');
+  const j = await post('/api/alpha/decisions', { model: JEV_ID, state: JSON.stringify(st), questions: { jugada: { type: 'choice',
+    instructions: 'Sos el jugador de buscaminas. Elegí UNA jugada que avance sin perder una vida. El código ya calculó qué celdas están demostradas como seguras o como minas (lo_que_demostro_el_codigo). Destapar una celda segura avanza sin riesgo; poner bandera en una mina demostrada ayuda a las cuentas siguientes. Si no hay nada demostrado, elegí la celda con MENOR probabilidad de ser mina: cada restricción vecina indica cuántas minas faltan entre sus vecinas ocultas.',
+    criteria: crit } } });
+  const a = j.answers?.jugada, k = a?.choice; if (!crit[k]) throw new Error('Jev devolvió una opción inválida');
   P.costo += j.usage?.cost || 0; P.llamadas++;
-  const [f, c] = crit[k].celda, pr = a.probabilities?.[k];
-  return { jugadas: [['revelar', f, c, 'jev']], txt: `Jev eligió (${f},${c}) entre ${cand.length} candidatas${pr != null ? ' · confianza ' + pr.toFixed(2) : ''}` };
+  const o = ops[+k.slice(1)], [f, c] = o.k.split(',').map(Number), pr = a.probabilities?.[k];
+  P.ultima = { txt: `${o.acc === 'revelar' ? 'destapar' : 'bandera en'} (${f},${c}) — ${o.crit.lo_que_demostro_el_codigo}`, n: ops.length, p: pr };
+  return { jugadas: [[o.acc, f, c, 'jev']], txt: `Jev eligió ${o.acc === 'revelar' ? 'destapar' : 'bandera en'} (${f},${c}) entre ${ops.length} opciones${pr != null ? ' · confianza ' + pr.toFixed(2) : ''}` };
 }
 async function jugarLLM(t, P) {
   const prompt = `${REGLAS(t.J)}\n\nVidas restantes: ${t.vidas}\nTablero actual:\n${t.texto()}\n\nDecidí tus próximas jugadas. Podés hacer varias en este turno si son lógicamente seguras. Respondé SOLO con JSON: {"jugadas":[{"accion":"revelar"|"bandera","fila":n,"col":n}]}`;
@@ -442,8 +456,10 @@ async function jugarLLM(t, P) {
 // Simulación: sin IA ni red. Jev simulado elige la candidata con menor proporción local de minas;
 // los modelos simulados deducen con código y, si se traban, arriesgan al azar, con demoras de un modelo real.
 async function simJev(t, P) {
-  const r = turnoCodigo(t); if (r) return r;
   await sleep(250 + Math.random() * 150);
+  const d = deducir(t, true);   // Jev simulado: con los datos del código, prefiere lo demostrado
+  if (d.seg.length) { P.llamadas++; const [f, c] = d.seg[0]; return { jugadas: [['revelar', f, c, 'jev']], txt: `Jev (simulado) destapó (${f},${c}), demostrada segura` }; }
+  if (d.min.length) { P.llamadas++; const [f, c] = d.min[0]; return { jugadas: [['bandera', f, c, 'jev']], txt: `Jev (simulado) marcó (${f},${c}), demostrada mina` }; }
   const R = t.restricciones(), riesgo = {};
   for (const x of R) for (const p of x.o) riesgo[p] = Math.max(riesgo[p] ?? 0, x.falt / x.o.length);
   const ocultas = []; t.e.forEach((fila, f) => fila.forEach((v, c) => v === 'h' && ocultas.push(f + ',' + c)));
@@ -466,6 +482,12 @@ function registrar(P, t, acc, f, c, quien) {
   const g = P.reg;
   if (t.e[f]?.[c] !== 'h') return;   // celda ya abierta (p. ej. por una cascada): no es una decisión
   if (quien === 'codigo') g.codigo++; if (quien === 'jev') g.jev++;
+  if (quien === 'jev') {   // ¿cuando había jugadas demostradas, Jev eligió una?
+    const dj = deducir(t, true);
+    if (dj.seg.length || dj.min.length) { g.conDemo = (g.conDemo || 0) + 1;
+      const en = (L) => L.some(([x, y]) => x === f && y === c);
+      if ((acc === 'revelar' && en(dj.seg)) || (acc === 'bandera' && en(dj.min))) g.eligioDemo = (g.eligioDemo || 0) + 1; }
+  }
   if (acc === 'bandera') { t.mina(f, c) ? g.bandBien++ : g.bandMal++; return; }
   const d = deducir(t, true), segura = quien === 'codigo' || d.seg.some(([x, y]) => x === f && y === c), trabado = !d.seg.length && !d.min.length;
   if (segura) g.seguras++; else { g.riesgos++; if (trabado) g.forzados++; }
@@ -498,10 +520,12 @@ function explicar() {
     h += `<h3><span class="who">${logoHTML(p.id, 22)}${nom(p)}</span> <span class="tag ${p.estado === 'resuelto' ? 'ok' : p.estado === 'sin vidas' ? 'bad' : ''}">${esc(p.estado)}</span></h3><ul>`;
     h += `<li>Destapó ${p.t.seguras()} de ${tot} celdas en ${fmtT(segT(p))}, con un costo de $${fmt$(p.costo)} en ${p.llamadas} llamada(s).</li>`;
     h += `<li>De sus ${g.seguras + g.riesgos} jugadas de destapar, <b>${g.seguras} eran demostrablemente seguras</b> y ${g.riesgos} fueron riesgos${g.riesgos ? ` (${g.forzados} sin ninguna jugada segura disponible)` : ''}.</li>`;
-    if (p.id !== JEV_ID && p.id.startsWith('typesafe/')) h += `<li>En esta partida grabada Jev jugaba con la <b>versión anterior</b>: decidía todas las jugadas solo, sin que el código hiciera las demostrables. Hoy juega en equipo con el código.</li>`;
-    if (p.id === JEV_ID) h += g.jev
-      ? `<li>Trabajo en equipo: el código hizo ${g.codigo} jugadas demostrables y <b>Jev decidió ${g.jev} vez/veces</b>, solo cuando había que arriesgar.</li>`
-      : `<li><b>Jev no fue consultado:</b> el código resolvió todo con lógica y nunca hubo que arriesgar. En este tablero Jev no fue puesto a prueba; para verlo decidir, subí la cantidad de minas (22% o más del tablero suele obligar a arriesgar).</li>`;
+    if (p.id !== JEV_ID && p.id.startsWith('typesafe/')) h += `<li>En esta partida grabada Jev jugaba con la <b>versión anterior</b>: decidía todo sin datos del código (tenía que hacer las cuentas él mismo). Hoy el código le pasa los datos de cada jugada y Jev decide.</li>`;
+    if (p.id === JEV_ID) {
+      h += `<li><b>Jev tomó las ${g.jev} decisiones.</b> En cada turno el código le pasó las jugadas posibles con sus datos (qué estaba demostrado como seguro o como mina) y Jev eligió una.</li>`;
+      if (g.conDemo) h += `<li>Cuando había jugadas demostradas disponibles (${g.conDemo} turnos), Jev eligió una de ellas <b>${g.eligioDemo || 0} veces (${Math.round(100 * (g.eligioDemo || 0) / g.conDemo)}%)</b>: así usa los datos que le da el código.</li>`;
+      if (g.forzados) h += `<li>En ${g.forzados} turno(s) no había nada demostrado y Jev tuvo que juzgar qué celda era menos riesgosa: ahí se ve su criterio.</li>`;
+    }
     if (malas.length) h += `<li><b>Error evitable:</b> pisó ${malas.length} mina(s) habiendo jugadas seguras disponibles (${malas.map(m => `(${m.f},${m.c}) con ${m.nSeg} seguras a mano`).join('; ')}). No fue mala suerte: fue un error de razonamiento.</li>`;
     if (forz.length) h += `<li>Pisó ${forz.length} mina(s) en momentos sin ninguna jugada segura (${forz.map(m => `(${m.f},${m.c})`).join(', ')}): ahí había que arriesgar y salió mal.</li>`;
     if (g.bandMal) h += `<li>Puso ${g.bandMal} bandera(s) en celdas sin mina: eso confunde sus propias cuentas de las jugadas siguientes.</li>`;
@@ -520,6 +544,17 @@ function explicar() {
     const rap = [...term].sort((a, b) => segT(a) - segT(b))[0], bar = [...term].sort((a, b) => a.costo - b.costo)[0];
     h += `<h3>Eficiencia entre los que resolvieron</h3><p>Más rápido: <b>${nom(rap)}</b> (${fmtT(segT(rap))}). Más barato: <b>${nom(bar)}</b> ($${fmt$(bar.costo)}).</p>`;
   }
+  const pj = P.find(p => p.id === JEV_ID), uq = pj?.ultima;
+  h += `<h3><span class="who">${logoHTML(JEV_ID, 22)}Cómo decide Jev</span></h3>
+    <p>Jev es un modelo "System One" de TypeSafe: en vez de escribir texto, responde preguntas con un formato fijo que el programa usa directo, y cada respuesta trae sus probabilidades. TypeSafe lo describe como <i>"fast, structured decisions that software can use directly"</i>, con respuestas de 70 a 500 ms. <a href="https://typesafe.ai/blog/introducing-system-one-models-and-jev" target="_blank" rel="noopener">Leer la presentación de Jev</a> · <a href="https://docs.typesafe.ai" target="_blank" rel="noopener">Documentación</a></p>
+    <p>Se le pueden hacer tres tipos de pregunta:</p>
+    <ul>
+      <li><b><a href="https://docs.typesafe.ai/primitives/noul" target="_blank" rel="noopener">Noul</a> — qué tan cierto es algo.</b> Responde sí o no con una probabilidad. En el buscaminas: <i>"¿todas las celdas tapadas alrededor de este 2 son minas?"</i> → "sí, 0,87".</li>
+      <li><b><a href="https://docs.typesafe.ai/primitives/score" target="_blank" rel="noopener">Score</a> — puntuar con una escala.</b> Vos definís los niveles y responde la probabilidad de cada uno. En el buscaminas: <i>"¿qué tan riesgosa es esta celda, de 0 (segura) a 4 (casi seguro mina)?"</i></li>
+      <li><b><a href="https://docs.typesafe.ai/primitives/choice" target="_blank" rel="noopener">Choice</a> — elegir entre opciones.</b> Elige una de una lista y da la probabilidad de cada opción. En el buscaminas: <i>"¿cuál de estas jugadas hacés?"</i></li>
+    </ul>
+    <p class="clave"><b>En este juego Jev usa Choice.</b> En cada turno el código arma la lista de jugadas posibles con sus datos (qué está demostrado como seguro o como mina y cuántas minas faltan alrededor) y Jev elige una. Es el reparto que propone TypeSafe: preguntas cortas, armadas por el código; las cuentas exactas las hace el código y el juicio, Jev.${uq ? ` Por ejemplo, en su última decisión eligió <b>${esc(uq.txt)}</b> entre ${uq.n} opciones${uq.p != null ? `, con una probabilidad de ${uq.p.toFixed(2)}` : ''}.` : ''}</p>
+    ${MODO_GRABADA ? `<p class="k">En la partida grabada, Jev usaba la versión anterior: preguntas Noul por cada número ("¿todas las tapadas son minas?" / "¿ninguna lo es?"), sin que el código le dijera qué estaba demostrado.</p>` : ''}`;
   h += `<p class="k" style="margin-top:16px">Cómo se calcula: antes de cada jugada, el código revisa si existía una celda segura demostrable con dos reglas (un número con todas sus minas marcadas, y la comparación entre dos números vecinos). Si el jugador destapó una celda que no estaba en esa lista, cuenta como riesgo. Hay deducciones más profundas que estas reglas no ven, así que "riesgo" quiere decir "no demostrable con estas reglas". Una sola partida es una observación, no un ranking.</p>`;
   $('#expBody').innerHTML = h; $('#expModal').classList.add('on');
 }
@@ -605,7 +640,7 @@ async function correr(P, id) {
     P.last = r.txt; sinAvance = avance ? 0 : sinAvance + 1;
     pintarPanel(P);
     if (sinAvance >= 3) break;
-    if (P.id === CODE_ID || r.jugadas[0]?.[3] === 'codigo') await sleep(180);   // para que se vea
+    if (P.id === CODE_ID) await sleep(180);   // para que se vea
   }
   P.fin = (performance.now() - P.t0) / 1000;
   P.estado = t.ganado() ? 'resuelto' : t.vidas <= 0 ? 'sin vidas' : P.estado === 'error' ? 'error' : 'incompleto';
@@ -699,9 +734,7 @@ function pintarRes(P, final) {
     const g = p.reg, band = g.bandBien + g.bandMal, dec = g.seguras + g.riesgos + band;
     const evit = g.minas.filter(m => m.nSeg > 0).length, bien = dec - g.minas.length - g.bandMal;
     const acierto = dec ? Math.round(100 * bien / dec) + '%' : '—';
-    const quien = p.id !== JEV_ID || !dec ? ''
-      : g.jev ? `<div class="k">código ${g.codigo} · Jev ${g.jev}</div>`
-      : `<div class="k" title="El código resolvió todo con lógica: nunca hubo que arriesgar, así que no se le preguntó nada a Jev.">todo con lógica · Jev no fue consultado</div>`;
+    const quien = p.id === JEV_ID && dec ? `<div class="k" title="Todas las decisiones las tomó Jev; el código solo le pasó los datos de cada opción.">todas de Jev · el código aporta datos</div>` : '';
     return `<tr><td><span class="who">${logoHTML(p.id, 20)}${esc(p.nombre)}</span></td><td>${esc(p.estado)}</td>
       <td>${p.t.seguras()} / ${tot}</td><td>${Math.max(p.t.vidas, 0)}</td>
       <td><b>${dec}</b>${quien}</td>
@@ -711,7 +744,7 @@ function pintarRes(P, final) {
       <td>${fmtT(segT(p))}</td><td>${dec ? (segT(p) / dec).toFixed(2) : '—'}</td>
       <td>$${fmt$(p.costo)}</td><td>${dec && p.costo ? '$' + fmt$(p.costo / dec) : dec ? '$0' : '—'}</td></tr>`;
   }).join('');
-  $('#nota').textContent = MODO_GRABADA ? 'Partida grabada el 30/09/2026 y reproducida con sus tiempos reales (o acelerada). En esa versión Jev jugaba solo: decidía todas las jugadas sin ayuda del código. Hoy Jev juega en equipo con el código.' : SIM ? 'Simulación: jugadores falsos, sin IA real ni costo. Sirve para ver la pantalla y el tablero; no compara modelos.' : final ? 'Una partida es una muestra chica: los modelos (y Jev) varían entre corridas. Para comparar en serio, jugá varias veces el mismo tablero o varios tableros.' : 'Jugando… los resultados se completan al terminar.';
+  $('#nota').textContent = MODO_GRABADA ? 'Partida grabada el 30/09/2026 y reproducida con sus tiempos reales (o acelerada). En esa versión Jev decidía sin datos del código. Hoy el código le pasa los datos de cada jugada y Jev decide.' : SIM ? 'Simulación: jugadores falsos, sin IA real ni costo. Sirve para ver la pantalla y el tablero; no compara modelos.' : final ? 'Una partida es una muestra chica: los modelos (y Jev) varían entre corridas. Para comparar en serio, jugá varias veces el mismo tablero o varios tableros.' : 'Jugando… los resultados se completan al terminar.';
 }
 $('#jugar').onclick = () => empezar(false, false);
 $('#simular').onclick = () => empezar(false, true);
@@ -723,8 +756,8 @@ function salirGrabada() { MODO_GRABADA = false; $('#vel').style.display = 'none'
 document.querySelectorAll('a[href="partida-grabada.html"]').forEach(a => a.onclick = e => { e.preventDefault(); MODO_GRABADA = true; history.replaceState(null, '', '?grabada'); verGrabada(); });
 $('#minasN').addEventListener('input', () => { const k = cfg();
   $('#minasHint').textContent = typeof k === 'string' ? k : `${Math.round(100 * k.M / (k.R * k.C))}% del tablero. ` + (k.M / (k.R * k.C) < 0.2
-    ? 'Con tan pocas minas el código suele resolver todo con lógica y Jev casi no decide.'
-    : 'Con esta densidad suele haber que arriesgar: ahí decide Jev.'); });
+    ? 'Pocas minas: casi todas las decisiones tienen una jugada segura a mano.'
+    : 'Con esta densidad suele haber que arriesgar: ahí se ve el criterio de cada modelo.'); });
 $('#volver').onclick = () => { corrida++; MODO_GRABADA = false; $('#vel').style.display = 'none';
   if (location.search.includes('grabada')) history.replaceState(null, '', location.pathname); $('#juego').style.display = 'none'; $('#setup').style.display = 'block'; document.body.classList.remove('playing'); $('#resModal').classList.remove('on'); };
 $('#verRes').onclick = () => $('#resModal').classList.add('on');

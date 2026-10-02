@@ -9,7 +9,7 @@ Demo: https://arena-buscaminas.pages.dev
 
 - Elegís hasta 9 modelos del catálogo en vivo de [OpenRouter](https://openrouter.ai), el tamaño del tablero y la cantidad de minas.
 - Todos juegan **el mismo tablero** en paralelo, con 3 vidas y la misma jugada inicial.
-- **Jev juega en equipo con código.** El código hace todo lo que se puede demostrar, y Jev (primitivo `choice`) elige la celda de menor riesgo solo cuando hay que arriesgar. Sus decisiones se marcan en amarillo.
+- **Jev toma todas sus decisiones; el código calcula.** En cada turno el código arma las jugadas posibles con sus datos (qué está demostrado como seguro o como mina, y cuántas minas faltan alrededor) y Jev elige una con el primitivo `choice`. Es el patrón "el código ofrece, Jev elige". Sus decisiones se marcan en amarillo.
 - **Los otros modelos** ven el tablero completo en texto y deciden todas sus jugadas.
 - **Solo código** es el control sin IA: deduce lo seguro y, si se traba, arriesga al azar.
 - **Simular sin gastar** muestra la pantalla con jugadores falsos, sin red ni costo.
@@ -19,6 +19,8 @@ Una partida es una observación, no un ranking: los modelos varían entre corrid
 ## Quién paga
 
 Nadie te presta tokens: cada persona toca **Conectar con OpenRouter** (login oficial con OAuth PKCE) y las partidas se descuentan de **su** saldo. La página no tiene servidor, así que todo va directo del navegador a OpenRouter. El acceso queda guardado solo en ese navegador, y "Desconectar" lo borra.
+
+**Cuenta anfitriona (opcional, solo en Cloudflare Pages).** Si querés que tus visitantes jueguen sin conectarse, cargá tu clave como secreto del proyecto: `wrangler pages secret put OPENROUTER_API_KEY`. La función `functions/api/or/[[path]].js` hace de intermediaria: la clave nunca llega al navegador ni al repo, solo deja pasar las dos llamadas del juego, solo acepta pedidos desde tu propio sitio y limita el tamaño de las respuestas. Ponele un límite de crédito a esa clave en OpenRouter.
 
 ## Tu propia arena (fork)
 
