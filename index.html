@@ -82,6 +82,20 @@ body.playing #juego{height:100vh;height:100dvh;display:flex;flex-direction:colum
 .tabwrap .bd{width:min(100cqw,100cqh * var(--arn));height:auto}
 #resModal,#expModal{position:fixed;inset:0;background:rgba(8,8,10,.8);display:none;place-items:center;z-index:40;padding:16px}
 #resModal.on,#expModal.on{display:grid}#expModal{z-index:45}
+#insModal{position:fixed;inset:0;background:rgba(8,8,10,.8);display:none;place-items:center;z-index:46;padding:16px}#insModal.on{display:grid}
+#insModal .caja{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:20px;width:min(1240px,100%);max-height:92vh;overflow:auto}
+.insgrid{display:grid;grid-template-columns:1fr 1.15fr;gap:18px}
+@media (max-width:820px){.insgrid{grid-template-columns:1fr}}
+.insh{font-size:14px;color:var(--txt);margin:6px 0 8px;display:flex;gap:10px;align-items:baseline}
+.insh .k{font-family:var(--mono);font-size:11px;color:var(--mut)}
+#insModal pre{background:#0d0d10;border:1px solid var(--line);border-radius:6px;padding:12px;font-family:var(--mono);font-size:11.5px;line-height:1.5;color:#cfcfd4;white-space:pre-wrap;word-break:break-word;max-height:34vh;overflow:auto;margin:0 0 12px}
+.opt{border-bottom:1px solid var(--line);padding:10px 4px;display:grid;grid-template-columns:1fr 150px 56px;gap:12px;align-items:center}
+.opt .o{font-family:var(--mono);font-size:12px;color:var(--txt)}.opt .o small{display:block;color:var(--mut);font-style:italic;font-family:var(--sans);font-size:12px;margin-top:3px}
+.opt .pct{font-size:15px;font-weight:600}.opt .pct span{font-weight:400;color:var(--mut);font-size:12px;margin-left:4px}
+.bar{height:3px;background:#2a2a30;border-radius:2px;position:relative;margin-top:8px}.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:var(--ok)}
+.opt.win{background:#16190f}.opt.win .o{color:var(--ok)}
+.tagp{font-family:var(--mono);font-size:10px;background:#1e1e22;color:var(--mut);padding:3px 6px;border-radius:3px;justify-self:end}
+.pn-h .ver{font-family:var(--mono);font-size:10px;padding:3px 6px;border:1px solid var(--jev);color:var(--jev);background:none;border-radius:3px;cursor:pointer;white-space:nowrap}
 .exp{font-size:14px;line-height:1.6;color:#cfcfd4}
 .exp h3{font-size:15px;margin:18px 0 6px;color:var(--txt);display:flex;gap:8px;align-items:center}
 .exp p{margin:6px 0}.exp ul{margin:6px 0;padding-left:20px}.exp li{margin:3px 0}
@@ -170,6 +184,18 @@ footer.wrap{padding:28px 16px 60px;color:var(--dim);font-size:12px;font-family:v
     <div class="caja">
       <div class="row-h"><div class="lbl" id="expTit"><i style="background:var(--jev)"></i>¿Por qué pasó lo que pasó?</div><button class="btn" id="cerrarExp">Cerrar</button></div>
       <div id="expBody" class="exp"></div>
+    </div>
+  </div>
+  <div id="insModal" role="dialog" aria-modal="true" aria-labelledby="insTit">
+    <div class="caja ins">
+      <div class="row-h"><div class="lbl" id="insTit"><i style="background:var(--jev)"></i>Qué vio y qué decidió Jev</div>
+        <div class="go"><button class="btn" id="insPrev">← Anterior</button><span class="note" id="insN"></span><button class="btn" id="insNext">Siguiente →</button><button class="btn" id="cerrarIns">Cerrar</button></div></div>
+      <div class="insgrid">
+        <div><div class="insh">State <span class="k">lo que le pasa el código</span></div><pre id="insState"></pre>
+             <div class="insh">Questions <span class="k">la pregunta</span></div><pre id="insQ"></pre></div>
+        <div><div class="insh">Response <span class="k" id="insMeta"></span></div><div id="insResp"></div>
+             <p class="note" style="line-height:1.6;margin-top:14px">Como en el Playground de TypeSafe: a la izquierda el estado y la pregunta que armó el código; a la derecha la respuesta de Jev, con la probabilidad de cada opción. La opción elegida es la de mayor probabilidad. <a href="https://docs.typesafe.ai/primitives/choice" target="_blank" rel="noopener" style="color:var(--jev)">Cómo funciona Choice</a></p></div>
+      </div>
     </div>
   </div>
   <div id="resModal" role="dialog" aria-modal="true" aria-labelledby="resTit">
@@ -432,10 +458,13 @@ async function jugarJev(t, P) {
   const crit = {}; ops.forEach((o, i) => crit['o' + i] = o.crit);
   const st = { reglas: REGLAS(t.J), vidas: t.vidas, minas_sin_marcar: t.J.M - marcadas, celdas_ocultas: ocultas.length,
     densidad_de_minas_en_ocultas: +((t.J.M - marcadas) / ocultas.length).toFixed(3) };
-  const j = await post('/api/alpha/decisions', { model: JEV_ID, state: JSON.stringify(st), questions: { jugada: { type: 'choice',
+  const t0q = performance.now();
+  const body = { model: JEV_ID, state: JSON.stringify(st), questions: { jugada: { type: 'choice',
     instructions: 'Sos el jugador de buscaminas. Elegí UNA jugada que avance sin perder una vida. El código ya calculó qué celdas están demostradas como seguras o como minas (lo_que_demostro_el_codigo). Destapar una celda segura avanza sin riesgo; poner bandera en una mina demostrada ayuda a las cuentas siguientes. Si no hay nada demostrado, elegí la celda con MENOR probabilidad de ser mina: cada restricción vecina indica cuántas minas faltan entre sus vecinas ocultas.',
-    criteria: crit } } });
+    criteria: crit } } };
+  const j = await post('/api/alpha/decisions', body);
   const a = j.answers?.jugada, k = a?.choice; if (!crit[k]) throw new Error('Jev devolvió una opción inválida');
+  (P.historial ||= []).push({ st, q: body.questions, a, ms: Math.round(performance.now() - t0q), modelo: j.model || JEV_ID, costo: j.usage?.cost });
   P.costo += j.usage?.cost || 0; P.llamadas++;
   const o = ops[+k.slice(1)], [f, c] = o.k.split(',').map(Number), pr = a.probabilities?.[k];
   P.ultima = { txt: `${o.acc === 'revelar' ? 'destapar' : 'bandera en'} (${f},${c}) — ${o.crit.lo_que_demostro_el_codigo}`, n: ops.length, p: pr };
@@ -455,17 +484,24 @@ async function jugarLLM(t, P) {
 
 // Simulación: sin IA ni red. Jev simulado elige la candidata con menor proporción local de minas;
 // los modelos simulados deducen con código y, si se traban, arriesgan al azar, con demoras de un modelo real.
+function simHistorial(t, P, acc, f, c) {   // para que el inspector también funcione en la simulación
+  const { ops, ocultas } = opcionesJev(t); let idx = ops.findIndex(o => o.acc === acc && o.k === f + ',' + c);
+  if (idx < 0) { ops.push({ acc, k: f + ',' + c, crit: { accion: acc === 'revelar' ? 'destapar' : 'poner bandera', celda: [f, c], lo_que_demostro_el_codigo: 'sin demostración: puede ser mina' } }); idx = ops.length - 1; }
+  const crit = {}, probabilities = {}; ops.forEach((o, i) => { crit['o' + i] = o.crit; probabilities['o' + i] = i === idx ? 0.9 : +(0.1 / Math.max(1, ops.length - 1)).toFixed(3); });
+  (P.historial ||= []).push({ sim: true, st: { celdas_ocultas: ocultas.length, vidas: t.vidas }, q: { jugada: { type: 'choice', instructions: '(simulación)', criteria: crit } },
+    a: { choice: 'o' + idx, probabilities }, ms: 300, modelo: 'Jev simulado' });
+}
 async function simJev(t, P) {
   await sleep(250 + Math.random() * 150);
   const d = deducir(t, true);   // Jev simulado: con los datos del código, prefiere lo demostrado
-  if (d.seg.length) { P.llamadas++; const [f, c] = d.seg[0]; return { jugadas: [['revelar', f, c, 'jev']], txt: `Jev (simulado) destapó (${f},${c}), demostrada segura` }; }
-  if (d.min.length) { P.llamadas++; const [f, c] = d.min[0]; return { jugadas: [['bandera', f, c, 'jev']], txt: `Jev (simulado) marcó (${f},${c}), demostrada mina` }; }
+  if (d.seg.length) { P.llamadas++; const [f, c] = d.seg[0]; simHistorial(t, P, 'revelar', f, c); return { jugadas: [['revelar', f, c, 'jev']], txt: `Jev (simulado) destapó (${f},${c}), demostrada segura` }; }
+  if (d.min.length) { P.llamadas++; const [f, c] = d.min[0]; simHistorial(t, P, 'bandera', f, c); return { jugadas: [['bandera', f, c, 'jev']], txt: `Jev (simulado) marcó (${f},${c}), demostrada mina` }; }
   const R = t.restricciones(), riesgo = {};
   for (const x of R) for (const p of x.o) riesgo[p] = Math.max(riesgo[p] ?? 0, x.falt / x.o.length);
   const ocultas = []; t.e.forEach((fila, f) => fila.forEach((v, c) => v === 'h' && ocultas.push(f + ',' + c)));
   const marcadas = t.e.flat().filter(v => v === 'f' || v === 'x').length, dens = (t.J.M - marcadas) / ocultas.length;
   const k = ocultas.map(k => [k, riesgo[k] ?? dens]).sort((a, b) => a[1] - b[1])[0][0];
-  P.llamadas++; const [f, c] = k.split(',').map(Number);
+  P.llamadas++; const [f, c] = k.split(',').map(Number); simHistorial(t, P, 'revelar', f, c);
   return { jugadas: [['revelar', f, c, 'jev']], txt: `Jev (simulado) eligió (${f},${c})` };
 }
 async function simLLM(t, P) {
@@ -554,9 +590,11 @@ function explicar() {
       <li><b><a href="https://docs.typesafe.ai/primitives/choice" target="_blank" rel="noopener">Choice</a> — elegir entre opciones.</b> Elige una de una lista y da la probabilidad de cada opción. En el buscaminas: <i>"¿cuál de estas jugadas hacés?"</i></li>
     </ul>
     <p class="clave"><b>En este juego Jev usa Choice.</b> En cada turno el código arma la lista de jugadas posibles con sus datos (qué está demostrado como seguro o como mina y cuántas minas faltan alrededor) y Jev elige una. Es el reparto que propone TypeSafe: preguntas cortas, armadas por el código; las cuentas exactas las hace el código y el juicio, Jev.${uq ? ` Por ejemplo, en su última decisión eligió <b>${esc(uq.txt)}</b> entre ${uq.n} opciones${uq.p != null ? `, con una probabilidad de ${uq.p.toFixed(2)}` : ''}.` : ''}</p>
+    ${pj?.historial?.length ? `<p><button class="btn" id="abrirIns" style="border-color:var(--jev);color:var(--jev)">Ver cada decisión de Jev (estado, pregunta y respuesta)</button></p>` : ''}
     ${MODO_GRABADA ? `<p class="k">En la partida grabada, Jev usaba la versión anterior: preguntas Noul por cada número ("¿todas las tapadas son minas?" / "¿ninguna lo es?"), sin que el código le dijera qué estaba demostrado.</p>` : ''}`;
   h += `<p class="k" style="margin-top:16px">Cómo se calcula: antes de cada jugada, el código revisa si existía una celda segura demostrable con dos reglas (un número con todas sus minas marcadas, y la comparación entre dos números vecinos). Si el jugador destapó una celda que no estaba en esa lista, cuenta como riesgo. Hay deducciones más profundas que estas reglas no ven, así que "riesgo" quiere decir "no demostrable con estas reglas". Una sola partida es una observación, no un ranking.</p>`;
   $('#expBody').innerHTML = h; $('#expModal').classList.add('on');
+  const bi = $('#abrirIns'); if (bi) bi.onclick = () => abrirInspector(pj, 0);
 }
 
 // ---------------- partida ----------------
@@ -659,6 +697,34 @@ async function primerClic(P) {
   await sleep(700);
 }
 
+// ---------------- inspector: qué vio y qué decidió Jev (estilo Playground de TypeSafe) ----------------
+let INS = { P: null, i: 0 };
+function abrirInspector(P, i) {
+  if (!P?.historial?.length) return;
+  INS = { P, i: i ?? P.historial.length - 1 }; pintarInspector(); $('#insModal').classList.add('on');
+}
+function pintarInspector() {
+  const H = INS.P.historial, h = H[INS.i];
+  $('#insN').textContent = `decisión ${INS.i + 1} de ${H.length}`;
+  $('#insPrev').disabled = INS.i === 0; $('#insNext').disabled = INS.i === H.length - 1;
+  $('#insState').textContent = JSON.stringify(h.st, null, 2);
+  $('#insQ').textContent = JSON.stringify(h.q, null, 2);
+  $('#insMeta').textContent = `${h.sim ? 'simulado · ' : ''}${h.modelo} · ${h.ms} ms${h.costo ? ' · US$ ' + h.costo.toFixed(6) : ''}`;
+  const crit = h.q.jugada.criteria, pr = h.a.probabilities || {};
+  const keys = Object.keys(crit).sort((x, y) => (pr[y] || 0) - (pr[x] || 0));
+  $('#insResp').innerHTML = keys.map(k => { const c = crit[k], p = pr[k] || 0, win = k === h.a.choice;
+    return `<div class="opt${win ? ' win' : ''}"><div class="o">${k} · ${esc(c.accion)} (${c.celda.join(',')})${win ? ' ✓' : ''}<small>${esc(c.lo_que_demostro_el_codigo)}</small></div>
+      <div><div class="pct">${Math.round(p * 100)}%<span>${win ? 'elegida' : ''}</span></div><div class="bar"><i style="width:${Math.max(1, p * 100)}%;${win ? '' : 'background:#ff9a5c'}"></i></div></div>
+      <span class="tagp">Choice</span></div>`; }).join('');
+}
+$('#insPrev').onclick = () => { if (INS.i > 0) { INS.i--; pintarInspector(); } };
+$('#insNext').onclick = () => { if (INS.i < INS.P.historial.length - 1) { INS.i++; pintarInspector(); } };
+$('#cerrarIns').onclick = () => $('#insModal').classList.remove('on');
+$('#insModal').addEventListener('click', e => { if (e.target.id === 'insModal') $('#insModal').classList.remove('on'); });
+addEventListener('keydown', e => { if (!$('#insModal').classList.contains('on')) return;
+  if (e.key === 'Escape') $('#insModal').classList.remove('on'); if (e.key === 'ArrowLeft') $('#insPrev').click(); if (e.key === 'ArrowRight') $('#insNext').click(); });
+$('#paneles').addEventListener('click', e => { const b = e.target.closest('.ver'); if (b) abrirInspector(PARTIDA.find(p => p.i === +b.dataset.i)); });
+
 // ---------------- repetición de una partida grabada (misma interfaz) ----------------
 let VEL = 1, GRABADA = null;
 async function verGrabada() {
@@ -721,7 +787,8 @@ function pintarPanel(P) {
     const v = t.e[f][c], k = f + ',' + c, n = v === 'r' ? t.num(f, c) : 0;
     cells += `<div class="c ${v === 'h' ? '' : v}${t.por[k] === 'jev' ? ' j' : ''}${P.nuevas.has(k) ? ' new' : ''}${n ? ' n' + n : ''}">${n || ''}</div>`;
   }
-  el.innerHTML = `<div class="pn-h"><span class="who">${logoHTML(P.id, 24)}<b title="${esc(P.id)}">${esc(P.nombre)}${P.r ? ' · ' + { low: 'bajo', medium: 'medio', high: 'alto' }[P.r] : ''}</b></span>${tag}</div>
+  const ver = P.historial?.length ? `<button class="ver" data-i="${P.i}" title="Ver el estado, la pregunta y la respuesta de Jev">ver a Jev</button>` : '';
+  el.innerHTML = `<div class="pn-h"><span class="who">${logoHTML(P.id, 24)}<b title="${esc(P.id)}">${esc(P.nombre)}${P.r ? ' · ' + { low: 'bajo', medium: 'medio', high: 'alto' }[P.r] : ''}</b></span><span class="go" style="gap:6px">${ver}${tag}</span></div>
     <div class="stats"></div>
     <div class="tabwrap" style="--arn:${t.J.C / t.J.R}"><div class="bd" style="grid-template-columns:repeat(${t.J.C},1fr);grid-template-rows:repeat(${t.J.R},1fr);--ar:${t.J.C}/${t.J.R}">${cells}</div></div>
     <div class="last">${esc(P.last)} · ${P.llamadas} llamada(s)</div>`;
